@@ -106,10 +106,12 @@ flutter:
 # dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: true
-  ios: false
+  ios: true
   image_path: "assets/brand/icon.png"
   adaptive_icon_background: "#0A0B09"
   adaptive_icon_foreground: "assets/brand/icon_foreground.png"
+  remove_alpha_ios: true # iOS no admite alfa en el icono → fondo negro de marca
+  background_color_ios: "#0A0B09"
   min_sdk_android: 21
 
 # --- Splash de arranque: foto del Jeep sobre negro de marca ---
@@ -118,7 +120,7 @@ flutter_native_splash:
   color: "#0A0B09"
   image: assets/brand/car_logo.png
   android: true
-  ios: false
+  ios: true
   web: false
   android_12:
     color: "#0A0B09"

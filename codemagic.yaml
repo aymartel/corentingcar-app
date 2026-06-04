@@ -1,0 +1,49 @@
+# Codemagic CI/CD — build iOS y publicar en TestFlight (App Store Connect).
+# Requisitos antes de usarlo:
+#  1) El proyecto debe tener plataforma iOS (ver README: `flutter create --platforms=ios .`).
+#  2) En Codemagic > Teams/User settings > Integrations > App Store Connect, añade tu
+#     clave de API (Issuer ID + Key ID + .p8). Pon su NOMBRE en `integrations.app_store_connect`.
+#  3) Crea la app en App Store Connect con el bundle id de abajo y copia su "Apple ID"
+#     numérico en la variable APP_STORE_APP_ID.
+workflows:
+  ios-testflight:
+    name: iOS · TestFlight
+    instance_type: mac_mini_m2
+    max_build_duration: 60
+    integrations:
+      app_store_connect: CoRentingCar ASC Key # <-- nombre EXACTO de tu clave en Codemagic
+    environment:
+      ios_signing:
+        distribution_type: app_store # firma automática gestionada por Codemagic
+        bundle_identifier: com.coretingcar.coretingcar # <-- debe existir en App Store Connect
+      vars:
+        APP_STORE_APP_ID: 0000000000 # <-- Apple ID numérico de la app (App Store Connect > App > General)
+        API_URL: "https://api.corentingcar.uk" # backend de producción
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: Configurar firma (perfiles de App Store Connect)
+        script: xcode-project use-profiles
+      - name: Dependencias Flutter
+        script: flutter pub get
+      - name: Instalar Pods
+        script: find . -name "Podfile" -execdir pod install \;
+      - name: Build IPA (release) con la URL de producción
+        script: |
+          # Número de build siguiente al último de TestFlight (deben ser crecientes).
+          LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo 0)
+          flutter build ipa --release \
+            --dart-define=API_URL="$API_URL" \
+            --build-name=1.0.0 \
+            --build-number=$(($LATEST + 1)) \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - flutter_drive.log
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # beta_groups:            # opcional: grupos de testers a los que repartir
+        #   - Testers internos
