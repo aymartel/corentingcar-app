@@ -1,10 +1,10 @@
 # Codemagic CI/CD — build iOS y publicar en TestFlight (App Store Connect).
-# Requisitos antes de usarlo:
-#  1) El proyecto debe tener plataforma iOS (ver README: `flutter create --platforms=ios .`).
-#  2) En Codemagic > Teams/User settings > Integrations > App Store Connect, añade tu
-#     clave de API (Issuer ID + Key ID + .p8). Pon su NOMBRE en `integrations.app_store_connect`.
-#  3) Crea la app en App Store Connect con el bundle id de abajo y copia su "Apple ID"
-#     numérico en la variable APP_STORE_APP_ID.
+# Requisitos:
+#  - Plataforma iOS en el proyecto (ya está).
+#  - Integración "App Store Connect" en Codemagic con una API key de rol **Admin**
+#    (necesaria para crear certificado + provisioning profile). Su nombre debe coincidir
+#    con `integrations.app_store_connect` de abajo.
+#  - App creada en App Store Connect con el bundle id de abajo (su Apple ID numérico en APP_STORE_APP_ID).
 workflows:
   ios-testflight:
     name: iOS · TestFlight
@@ -17,19 +17,26 @@ workflows:
         - pattern: main
           include: true
     integrations:
-      app_store_connect: CoRentingCar ASC Key # <-- nombre EXACTO de tu clave en Codemagic
+      app_store_connect: CoRentingCar ASC Key # <-- nombre EXACTO de tu API key (rol Admin) en Codemagic
     environment:
-      ios_signing:
-        distribution_type: app_store # firma automática gestionada por Codemagic
-        bundle_identifier: com.coretingcar.coretingcar # <-- debe existir en App Store Connect
       vars:
-        APP_STORE_APP_ID: 6776807228 # Apple ID numérico de la app (App Store Connect)
+        APP_STORE_APP_ID: 6776807228 # Apple ID numérico de la app
+        BUNDLE_ID: "com.coretingcar.coretingcar"
         API_URL: "https://api.corentingcar.uk" # backend de producción
       flutter: stable
       xcode: latest
       cocoapods: default
     scripts:
-      - name: Configurar firma (perfiles de App Store Connect)
+      - name: Inicializar keychain
+        script: keychain initialize
+      - name: Crear/obtener certificado y provisioning profile (App Store)
+        script: |
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+      - name: Añadir certificados al keychain
+        script: keychain add-certificates
+      - name: Aplicar perfiles al proyecto Xcode
         script: xcode-project use-profiles
       - name: Dependencias Flutter
         script: flutter pub get
@@ -37,7 +44,7 @@ workflows:
         script: find . -name "Podfile" -execdir pod install \;
       - name: Build IPA (release) con la URL de producción
         script: |
-          # Número de build siguiente al último de TestFlight (deben ser crecientes).
+          # Número de build siguiente al último de TestFlight (deben crecer).
           LATEST=$(app-store-connect get-latest-testflight-build-number "$APP_STORE_APP_ID" || echo 0)
           flutter build ipa --release \
             --dart-define=API_URL="$API_URL" \
@@ -46,6 +53,7 @@ workflows:
             --export-options-plist=/Users/builder/export_options.plist
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
       - flutter_drive.log
     publishing:
       app_store_connect:
