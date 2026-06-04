@@ -10,6 +10,12 @@ workflows:
     name: iOS · TestFlight
     instance_type: mac_mini_m2
     max_build_duration: 60
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: main
+          include: true
     integrations:
       app_store_connect: CoRentingCar ASC Key # <-- nombre EXACTO de tu clave en Codemagic
     environment:
@@ -17,7 +23,7 @@ workflows:
         distribution_type: app_store # firma automática gestionada por Codemagic
         bundle_identifier: com.coretingcar.coretingcar # <-- debe existir en App Store Connect
       vars:
-        APP_STORE_APP_ID: 0000000000 # <-- Apple ID numérico de la app (App Store Connect > App > General)
+        APP_STORE_APP_ID: 6776807228 # Apple ID numérico de la app (App Store Connect)
         API_URL: "https://api.corentingcar.uk" # backend de producción
       flutter: stable
       xcode: latest
