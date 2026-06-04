@@ -29,15 +29,21 @@ workflows:
     scripts:
       - name: Inicializar keychain
         script: keychain initialize
-      - name: Crear certificado de distribución (con su clave privada)
-        # Genera un certificado NUEVO con clave privada local (evita el error
-        # "Cannot save Signing Certificates without certificate private key"
-        # al reusar un certificado existente cuya clave no está en la máquina).
-        script: app-store-connect create-certificate --type IOS_DISTRIBUTION --save
+      - name: Crear certificado de distribución (clave privada nueva)
+        # Genera una clave privada propia y crea un certificado NUEVO con ella
+        # (evita reusar un certificado existente cuya clave no está en la máquina).
+        # Usa el comando nuevo `certificates create` (el viejo está deprecado).
+        script: |
+          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/dist.key
+          app-store-connect certificates create \
+            --type IOS_DISTRIBUTION \
+            --certificate-key=@file:/tmp/dist.key \
+            --save
       - name: Crear/obtener provisioning profile (App Store)
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
+            --certificate-key=@file:/tmp/dist.key \
             --create
       - name: Añadir certificados al keychain
         script: keychain add-certificates
