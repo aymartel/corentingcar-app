@@ -1,0 +1,115 @@
+import 'package:coretingcar/common/theme/theme.dart';
+import 'package:coretingcar/data/models/models.dart';
+import 'package:coretingcar/data/providers.dart';
+import 'package:coretingcar/features/expenses/forms/forms.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:intl/date_symbol_data_local.dart';
+
+import '../helpers/fakes.dart';
+
+/// Monta un botón que abre el formulario indicado (como hacen HOY/GASTOS).
+Future<void> _pumpLauncher(
+  WidgetTester tester, {
+  required Future<bool?> Function(BuildContext) opener,
+  FakeExpensesService? expenses,
+  FakeUsageService? usage,
+}) async {
+  await tester.pumpWidget(
+    ProviderScope(
+      overrides: [
+        if (expenses != null)
+          expensesServiceProvider.overrideWithValue(expenses),
+        if (usage != null) usageServiceProvider.overrideWithValue(usage),
+      ],
+      child: MaterialApp(
+        theme: AppTheme.dark(),
+        home: Scaffold(
+          body: Builder(
+            builder: (context) => Center(
+              child: ElevatedButton(
+                onPressed: () => opener(context),
+                child: const Text('Abrir'),
+              ),
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.tap(find.text('Abrir'));
+  await tester.pumpAndSettle();
+}
+
+void main() {
+  setUpAll(() => initializeDateFormatting('es_ES'));
+
+  testWidgets('gasolina: importe inválido no envía', (tester) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(tester, opener: openFuelForm, expenses: expenses);
+
+    // Sin importe → validación, no se llama al servicio.
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pump();
+    expect(find.text('Importe inválido'), findsOneWidget);
+    expect(expenses.fuelCalls, 0);
+  });
+
+  testWidgets('gasolina: importe válido envía y cierra', (tester) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(tester, opener: openFuelForm, expenses: expenses);
+
+    await tester.enterText(find.byType(TextField), '20');
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(expenses.fuelCalls, 1);
+    expect(find.text('GUARDAR'), findsNothing); // el sheet se cerró
+  });
+
+  testWidgets('uso: km final < inicial no envía', (tester) async {
+    final usage = FakeUsageService();
+    await _pumpLauncher(tester, opener: openUsageForm, usage: usage);
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), '100'); // inicial
+    await tester.enterText(fields.at(1), '50'); // final
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pump();
+
+    expect(find.text('Debe ser ≥ al inicial'), findsOneWidget);
+    expect(usage.createCalls, 0);
+  });
+
+  testWidgets('uso: prerellena el km inicial con el último km final', (
+    tester,
+  ) async {
+    final usage = FakeUsageService(
+      usageList: const [
+        UsageLog(
+          id: 2,
+          userId: 1,
+          date: '2026-06-04',
+          startKm: 95,
+          endKm: 120,
+          totalKm: 25,
+          type: EntryType.individual,
+        ),
+        UsageLog(
+          id: 1,
+          userId: 1,
+          date: '2026-06-03',
+          startKm: 0,
+          endKm: 95,
+          totalKm: 95,
+          type: EntryType.individual,
+        ),
+      ],
+    );
+    await _pumpLauncher(tester, opener: openUsageForm, usage: usage);
+    await tester.pump(); // deja completar el prerellenado async
+
+    expect(find.text('120'), findsOneWidget);
+  });
+}
