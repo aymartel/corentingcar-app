@@ -1,10 +1,16 @@
 # Codemagic CI/CD — build iOS y publicar en TestFlight (App Store Connect).
 # Requisitos:
 #  - Plataforma iOS en el proyecto (ya está).
-#  - Integración "App Store Connect" en Codemagic con una API key de rol **Admin**
-#    (necesaria para crear certificado + provisioning profile). Su nombre debe coincidir
-#    con `integrations.app_store_connect` de abajo.
-#  - App creada en App Store Connect con el bundle id de abajo (su Apple ID numérico en APP_STORE_APP_ID).
+#  - Integración "App Store Connect" en Codemagic con una API key de rol **Admin**.
+#    Su nombre debe coincidir con `integrations.app_store_connect` de abajo.
+#  - App creada en App Store Connect con el bundle id de abajo (Apple ID numérico en APP_STORE_APP_ID).
+#  - Variable de entorno **segura** `CERTIFICATE_PRIVATE_KEY`: la clave privada RSA (PEM) del
+#    certificado de distribución, persistida para REUTILIZAR el mismo certificado en cada build
+#    (Apple solo permite 1 certificado iOS Distribution). Generarla una vez con:
+#      openssl genrsa 2048
+#    y pegar TODO el bloque (-----BEGIN/END-----) en Codemagic (Environment variables, secure).
+#    Si ya había un certificado iOS Distribution "huérfano" (sin clave), revócalo en
+#    developer.apple.com → Certificates antes del primer build con esta clave.
 workflows:
   ios-testflight:
     name: iOS · TestFlight
@@ -19,6 +25,8 @@ workflows:
     integrations:
       app_store_connect: CoRentingCar ASC Key # <-- nombre EXACTO de tu API key (rol Admin) en Codemagic
     environment:
+      groups:
+        - signing # grupo de Codemagic que contiene CERTIFICATE_PRIVATE_KEY (seguro)
       vars:
         APP_STORE_APP_ID: 6776807228 # Apple ID numérico de la app
         BUNDLE_ID: "com.coretingcar.coretingcar"
@@ -29,21 +37,15 @@ workflows:
     scripts:
       - name: Inicializar keychain
         script: keychain initialize
-      - name: Crear certificado de distribución (clave privada nueva)
-        # Genera una clave privada propia y crea un certificado NUEVO con ella
-        # (evita reusar un certificado existente cuya clave no está en la máquina).
-        # Usa el comando nuevo `certificates create` (el viejo está deprecado).
-        script: |
-          openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out /tmp/dist.key
-          app-store-connect certificates create \
-            --type IOS_DISTRIBUTION \
-            --certificate-key=@file:/tmp/dist.key \
-            --save
-      - name: Crear/obtener provisioning profile (App Store)
+      - name: Firma — certificado + provisioning profile (idempotente)
+        # Reutiliza el certificado iOS Distribution asociado a la clave privada
+        # PERSISTIDA (CERTIFICATE_PRIVATE_KEY). Si aún no existe, lo crea con ESA
+        # clave; en los siguientes builds lo reutiliza → no choca con el límite de
+        # Apple (1 certificado de distribución) ni pierde la clave entre máquinas.
         script: |
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
-            --certificate-key=@file:/tmp/dist.key \
+            --certificate-key=@env:CERTIFICATE_PRIVATE_KEY \
             --create
       - name: Añadir certificados al keychain
         script: keychain add-certificates
