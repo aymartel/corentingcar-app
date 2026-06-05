@@ -123,7 +123,9 @@ void main() {
     expect(find.text('Aparcado en: Garaje del trabajo'), findsOneWidget);
   });
 
-  testWidgets('lo tiene el otro → botón "Tengo el coche"', (tester) async {
+  testWidgets('lo tiene el otro → NO se puede coger hasta que lo libere', (
+    tester,
+  ) async {
     final car = FakeCarStatusService(
       status: CarStatus(
         availability: CarAvailability.taken,
@@ -134,6 +136,7 @@ void main() {
     await _pump(tester, car: car, me: user1);
 
     expect(find.text('Lo tiene Dennis'), findsOneWidget);
-    expect(find.text('Tengo el coche'), findsOneWidget);
+    expect(find.text('Tengo el coche'), findsNothing);
+    expect(find.text('Disponible cuando lo deje libre.'), findsOneWidget);
   });
 }

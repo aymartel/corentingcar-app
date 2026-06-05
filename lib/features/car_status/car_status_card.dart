@@ -146,25 +146,48 @@ class _CarStatusCardState extends ConsumerState<CarStatusCard> {
               mono: true,
             ),
           const SizedBox(height: AppSpacing.lg),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton.icon(
-              onPressed: _acting
-                  ? null
-                  : (isMine ? _release : _take),
-              icon: _acting
-                  ? const SizedBox(
-                      height: 18,
-                      width: 18,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: AppColors.onAccent,
+          // Solo se puede coger si está LIBRE; si lo tienes tú, lo dejas libre.
+          // Si lo tiene la otra persona, no hay acción (hay que esperar a que lo libere).
+          if (status.isFree || isMine)
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: _acting ? null : (isMine ? _release : _take),
+                icon: _acting
+                    ? const SizedBox(
+                        height: 18,
+                        width: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.onAccent,
+                        ),
+                      )
+                    : Icon(
+                        isMine ? Icons.logout : Icons.directions_car,
+                        size: 18,
                       ),
-                    )
-                  : Icon(isMine ? Icons.logout : Icons.directions_car, size: 18),
-              label: Text(isMine ? 'Lo dejo libre' : 'Tengo el coche'),
+                label: Text(isMine ? 'Lo dejo libre' : 'Tengo el coche'),
+              ),
+            )
+          else
+            Row(
+              children: [
+                const Icon(
+                  Icons.lock_clock_outlined,
+                  size: 18,
+                  color: AppColors.textMuted,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    'Disponible cuando lo deje libre.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ),
         ],
       ),
     );
