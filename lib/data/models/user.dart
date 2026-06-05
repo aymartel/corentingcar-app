@@ -12,10 +12,10 @@ class User {
 
   final int id;
 
-  /// Nombre visible (`'Andy'` | `'Amigo'`).
+  /// Nombre visible (`'Andy'` | `'Dennis'`).
   final String name;
 
-  /// Identificador estable: `'andy'` | `'amigo'`.
+  /// Identificador estable: `'user1'` | `'user2'`.
   final String profile;
 
   /// Color hex de la UI/calendario (canónico F0). Puede venir nulo.

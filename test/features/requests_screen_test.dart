@@ -23,7 +23,7 @@ Future<void> _pumpRequests(
     ProviderScope(
       overrides: [
         requestServiceProvider.overrideWithValue(requests),
-        currentUserProvider.overrideWithValue(andy),
+        currentUserProvider.overrideWithValue(user1),
       ],
       child: MaterialApp(theme: AppTheme.dark(), home: const RequestsScreen()),
     ),

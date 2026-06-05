@@ -1,6 +1,6 @@
 # CoRetingCar · App (Flutter)
 
-App para que **dos personas** (Andy y Amigo) compartan un coche de renting sin discusiones: deja claro
+App para que **dos personas** (Andy y Dennis) compartan un coche de renting sin discusiones: deja claro
 cada día **quién tiene prioridad** y registra kilómetros, gasolina y lavado.
 
 - **Tema**: dark/negro inspirado en la marca **JEEP**, moderno/futurista (ver `prompts/app/F0-design-system.md`).

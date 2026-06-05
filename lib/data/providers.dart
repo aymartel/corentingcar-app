@@ -60,6 +60,10 @@ final requestServiceProvider = Provider<RequestService>(
   (ref) => RequestService(ref.watch(apiClientProvider)),
 );
 
+final carStatusServiceProvider = Provider<CarStatusService>(
+  (ref) => CarStatusService(ref.watch(apiClientProvider)),
+);
+
 /// Los 2 perfiles (`GET /api/users`), cacheados a nivel de app para resolver
 /// nombres/colores por `id` en historiales (gasolina, lavado, solicitudes).
 final allUsersProvider = FutureProvider<List<User>>(

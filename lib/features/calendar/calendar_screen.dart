@@ -5,7 +5,9 @@ import '../../common/theme/theme.dart';
 import '../../common/widgets/async_views.dart';
 import '../../common/widgets/brand/brand.dart';
 import '../../core/format/es_format.dart';
+import '../../data/api/api_exception.dart';
 import '../../data/models/models.dart';
+import '../login/session_controller.dart';
 import '../requests/requests_controller.dart';
 import 'calendar_controller.dart';
 
@@ -41,8 +43,7 @@ class CalendarScreen extends ConsumerWidget {
           month: month,
           byDate: {for (final d in days) d.date: d},
           pendingDates: pendingDates,
-          onTapDay: (day) =>
-              _showDayDetail(context, day, pendingDates.contains(day.date)),
+          onTapDay: (day) => _showDayDetail(context, day),
         ),
       ),
     );
@@ -81,10 +82,11 @@ class CalendarScreen extends ConsumerWidget {
     );
   }
 
-  void _showDayDetail(BuildContext context, CalendarDay day, bool isPending) {
+  void _showDayDetail(BuildContext context, CalendarDay day) {
     showModalBottomSheet<void>(
       context: context,
-      builder: (_) => _DayDetailSheet(day: day, isPending: isPending),
+      isScrollControlled: true,
+      builder: (_) => _DayDetailSheet(day: day),
     );
   }
 }
@@ -316,8 +318,8 @@ class _Legend extends StatelessWidget {
           spacing: AppSpacing.lg,
           runSpacing: AppSpacing.sm,
           children: [
-            _LegendItem(color: AppColors.andy, label: 'Andy'),
-            _LegendItem(color: AppColors.amigo, label: 'Dennis'),
+            _LegendItem(color: AppColors.user1, label: 'Andy'),
+            _LegendItem(color: AppColors.user2, label: 'Dennis'),
             _LegendHandover(),
             _LegendPending(),
           ],
@@ -393,11 +395,47 @@ class _LegendPending extends StatelessWidget {
   }
 }
 
-class _DayDetailSheet extends StatelessWidget {
-  const _DayDetailSheet({required this.day, required this.isPending});
+/// Detalle de un día (bottom sheet). Además de la prioridad, ofrece **acciones
+/// de solicitud** según el contexto: pedir el coche (si no es tu día), cancelar
+/// (si ya lo pediste) o aceptar/rechazar (si te lo han pedido a ti).
+class _DayDetailSheet extends ConsumerStatefulWidget {
+  const _DayDetailSheet({required this.day});
 
   final CalendarDay day;
-  final bool isPending;
+
+  @override
+  ConsumerState<_DayDetailSheet> createState() => _DayDetailSheetState();
+}
+
+class _DayDetailSheetState extends ConsumerState<_DayDetailSheet> {
+  bool _busy = false;
+  String? _error;
+
+  CalendarDay get day => widget.day;
+
+  /// Ejecuta una acción de solicitud: cierra el sheet y avisa, o muestra error.
+  Future<void> _run(Future<void> Function() action, String success) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final navigator = Navigator.of(context);
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      await action();
+      if (!mounted) return;
+      navigator.pop();
+      messenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(SnackBar(content: Text(success)));
+    } on ApiException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } catch (_) {
+      if (mounted) setState(() => _error = 'No se pudo completar la acción.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -406,6 +444,19 @@ class _DayDetailSheet extends StatelessWidget {
     final theme = Theme.of(context);
     final date = DateTime.tryParse(day.date);
     final dateLabel = date == null ? day.date : EsFormat.weekday(date);
+
+    final me = ref.watch(currentUserProvider);
+    final requests =
+        ref.watch(requestsControllerProvider).asData?.value ??
+        const <UseRequest>[];
+    UseRequest? pending;
+    for (final r in requests) {
+      if (r.useDate == day.date && r.status.isPending) {
+        pending = r;
+        break;
+      }
+    }
+    final isMyDay = me != null && user.id == me.id;
 
     return SafeArea(
       child: Padding(
@@ -458,21 +509,23 @@ class _DayDetailSheet extends StatelessWidget {
                 ),
               ],
             ),
-            if (isPending) ...[
+            const SizedBox(height: AppSpacing.lg),
+            ..._actions(theme, me, pending, isMyDay),
+            if (_error != null) ...[
               const SizedBox(height: AppSpacing.md),
               Row(
                 children: [
                   const Icon(
-                    Icons.hourglass_top,
+                    Icons.error_outline,
                     size: 18,
-                    color: AppColors.accentAmber,
+                    color: AppColors.danger,
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Text(
-                      'Hay una solicitud pendiente de aprobación para este día.',
+                      _error!,
                       style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppColors.accentAmber,
+                        color: AppColors.danger,
                       ),
                     ),
                   ),
@@ -482,6 +535,143 @@ class _DayDetailSheet extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+
+  /// Acciones según el contexto (pedir / cancelar / aceptar+rechazar / es tu día).
+  List<Widget> _actions(
+    ThemeData theme,
+    User? me,
+    UseRequest? pending,
+    bool isMyDay,
+  ) {
+    final controller = ref.read(requestsControllerProvider.notifier);
+
+    if (pending != null) {
+      final req = pending;
+      if (req.requesterId == me?.id) {
+        return [
+          _note('Has pedido este día · pendiente de aprobación.', AppColors.accentAmber),
+          const SizedBox(height: AppSpacing.md),
+          SizedBox(
+            width: double.infinity,
+            child: _outlined(
+              icon: Icons.close,
+              label: 'Cancelar solicitud',
+              color: AppColors.danger,
+              onPressed: () =>
+                  _run(() => controller.cancel(req.id), 'Solicitud cancelada.'),
+            ),
+          ),
+        ];
+      }
+      if (req.recipientId == me?.id) {
+        return [
+          _note('${req.requester?.name ?? 'El otro'} te ha pedido este día.',
+              AppColors.accentAmber),
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            children: [
+              Expanded(
+                child: _outlined(
+                  icon: Icons.close,
+                  label: 'Rechazar',
+                  color: AppColors.danger,
+                  onPressed: () => _run(
+                    () => controller.reject(req.id),
+                    'Solicitud rechazada.',
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: _primary(
+                  icon: Icons.check,
+                  label: 'Aceptar',
+                  onPressed: () => _run(
+                    () => controller.accept(req.id),
+                    'Solicitud aceptada.',
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ];
+      }
+      return [_note('Hay una solicitud pendiente para este día.', AppColors.accentAmber)];
+    }
+
+    if (!isMyDay) {
+      return [
+        SizedBox(
+          width: double.infinity,
+          child: _primary(
+            icon: Icons.front_hand_outlined,
+            label: 'Pedir coche',
+            onPressed: () => _run(
+              () => controller.requestDay(day.date),
+              'Solicitud enviada.',
+            ),
+          ),
+        ),
+      ];
+    }
+
+    return [_note('Es tu día.', AppColors.brand, icon: Icons.verified_outlined)];
+  }
+
+  Widget _note(String text, Color color, {IconData icon = Icons.info_outline}) {
+    return Row(
+      children: [
+        Icon(icon, size: 18, color: color),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Text(
+            text,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: color),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _primary({
+    required IconData icon,
+    required String label,
+    required VoidCallback onPressed,
+  }) {
+    return FilledButton.icon(
+      onPressed: _busy ? null : onPressed,
+      icon: _busy
+          ? const SizedBox(
+              height: 18,
+              width: 18,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.onAccent,
+              ),
+            )
+          : Icon(icon, size: 18),
+      label: Text(label),
+    );
+  }
+
+  Widget _outlined({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onPressed,
+  }) {
+    return OutlinedButton.icon(
+      onPressed: _busy ? null : onPressed,
+      style: OutlinedButton.styleFrom(
+        foregroundColor: color,
+        side: BorderSide(color: color.withValues(alpha: 0.6)),
+      ),
+      icon: Icon(icon, size: 18),
+      label: Text(label),
     );
   }
 

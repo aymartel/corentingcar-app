@@ -7,6 +7,8 @@ import '../../common/widgets/brand/brand.dart';
 import '../../common/widgets/glow_card.dart';
 import '../../core/format/es_format.dart';
 import '../../data/models/models.dart';
+import '../car_status/car_status_card.dart';
+import '../car_status/car_status_controller.dart';
 import '../expenses/forms/forms.dart';
 import '../requests/request_badge.dart';
 import '../requests/request_form.dart';
@@ -40,7 +42,10 @@ class TodayScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: AppColors.brand,
         backgroundColor: AppColors.surface,
-        onRefresh: controller.refresh,
+        onRefresh: () => Future.wait([
+          controller.refresh(),
+          ref.read(carStatusProvider.notifier).refresh(),
+        ]),
         child: AsyncStateView<DailyPriority>(
           value: async,
           onRetry: controller.refresh,
@@ -76,6 +81,9 @@ class _TodayContent extends StatelessWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
+        // Disponibilidad real del coche (F12), lo más visible y accionable.
+        const CarStatusCard(),
+        const SizedBox(height: AppSpacing.xl),
         Text(_dateLabel(priority.date), style: AppTypography.hudLabel()),
         const SizedBox(height: AppSpacing.md),
         _PriorityHero(priority: priority),
@@ -276,8 +284,23 @@ class _ActionTile extends StatelessWidget {
           Expanded(
             child: Text(
               label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: AppTypography.hudLabel(color: AppColors.textPrimary),
             ),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          // "+" a la derecha: deja claro que la tarjeta es un botón de acción.
+          Container(
+            width: 24,
+            height: 24,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.surfaceAlt,
+              border: Border.all(color: AppColors.outlineStrong),
+            ),
+            child: const Icon(Icons.add, size: 15, color: AppColors.brand),
           ),
         ],
       ),

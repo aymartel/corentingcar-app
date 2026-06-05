@@ -28,11 +28,11 @@ void main() {
       ProviderScope(
         overrides: [
           tokenStoreProvider.overrideWithValue(
-            FakeTokenStore(token: 't', user: andy),
+            FakeTokenStore(token: 't', user: user1),
           ),
-          authServiceProvider.overrideWithValue(FakeAuthService(meUser: andy)),
+          authServiceProvider.overrideWithValue(FakeAuthService(meUser: user1)),
           priorityServiceProvider.overrideWithValue(
-            FakePriorityService(todayResult: priorityFor(andy)),
+            FakePriorityService(todayResult: priorityFor(user1)),
           ),
           usageServiceProvider.overrideWithValue(
             FakeUsageService(mileageResult: mileageSample()),

@@ -43,18 +43,18 @@ void main() {
 
     test('token + usuario guardados → authenticated', () async {
       final container = await _settledContainer(
-        store: FakeTokenStore(token: 't', user: andy),
-        auth: FakeAuthService(meUser: andy),
+        store: FakeTokenStore(token: 't', user: user1),
+        auth: FakeAuthService(meUser: user1),
       );
       final state = container.read(sessionControllerProvider);
       expect(state, isA<SessionAuthenticated>());
-      expect((state as SessionAuthenticated).user.profile, 'andy');
-      expect(container.read(currentUserProvider)?.profile, 'andy');
+      expect((state as SessionAuthenticated).user.profile, 'user1');
+      expect(container.read(currentUserProvider)?.profile, 'user1');
     });
 
     test('error de red con usuario previo → conserva la sesión', () async {
       final container = await _settledContainer(
-        store: FakeTokenStore(token: 't', user: andy),
+        store: FakeTokenStore(token: 't', user: user1),
         auth: FakeAuthService(
           meError: const ApiException('NETWORK', 'Sin conexión'),
         ),
@@ -66,7 +66,7 @@ void main() {
     });
 
     test('401 al restaurar → limpia y unauthenticated', () async {
-      final store = FakeTokenStore(token: 't', user: andy);
+      final store = FakeTokenStore(token: 't', user: user1);
       final container = await _settledContainer(
         store: store,
         auth: FakeAuthService(
@@ -91,13 +91,13 @@ void main() {
 
       await container
           .read(sessionControllerProvider.notifier)
-          .login('andy', '1234');
+          .login('user1', '1234');
 
       final state = container.read(sessionControllerProvider);
       expect(state, isA<SessionAuthenticated>());
-      expect((state as SessionAuthenticated).user.profile, 'andy');
-      expect(await store.readToken(), 'token-andy');
-      expect((await store.readUser())?.profile, 'andy');
+      expect((state as SessionAuthenticated).user.profile, 'user1');
+      expect(await store.readToken(), 'token-user1');
+      expect((await store.readUser())?.profile, 'user1');
     });
 
     test('PIN inválido → lanza y NO autentica', () async {
@@ -115,7 +115,7 @@ void main() {
       await expectLater(
         container
             .read(sessionControllerProvider.notifier)
-            .login('andy', '0000'),
+            .login('user1', '0000'),
         throwsA(isA<ApiException>()),
       );
       expect(
@@ -125,8 +125,8 @@ void main() {
     });
 
     test('logout limpia la sesión y vuelve a unauthenticated', () async {
-      final store = FakeTokenStore(token: 't', user: andy);
-      final auth = FakeAuthService(meUser: andy);
+      final store = FakeTokenStore(token: 't', user: user1);
+      final auth = FakeAuthService(meUser: user1);
       final container = await _settledContainer(store: store, auth: auth);
       expect(
         container.read(sessionControllerProvider),
@@ -144,10 +144,10 @@ void main() {
     });
 
     test('sesión caducada (401) expira la sesión y limpia el token', () async {
-      final store = FakeTokenStore(token: 't', user: andy);
+      final store = FakeTokenStore(token: 't', user: user1);
       final container = await _settledContainer(
         store: store,
-        auth: FakeAuthService(meUser: andy),
+        auth: FakeAuthService(meUser: user1),
       );
       expect(
         container.read(sessionControllerProvider),

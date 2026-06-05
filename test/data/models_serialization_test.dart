@@ -37,10 +37,10 @@ void main() {
       final user = User.fromJson({
         'id': 1,
         'name': 'Andy',
-        'profile': 'andy',
+        'profile': 'user1',
         'color': '#9CC93B',
       });
-      expect(user.profile, 'andy');
+      expect(user.profile, 'user1');
       expect(User.fromJson(user.toJson()).color, '#9CC93B');
     });
   });
@@ -94,7 +94,7 @@ void main() {
             'user': {
               'id': 1,
               'name': 'Andy',
-              'profile': 'andy',
+              'profile': 'user1',
               'color': '#9CC93B',
             },
             'individualKm': 6240,
@@ -107,7 +107,7 @@ void main() {
             'user': {
               'id': 2,
               'name': 'Dennis',
-              'profile': 'amigo',
+              'profile': 'user2',
               'color': '#FF8A3D',
             },
             'individualKm': 8430,
@@ -177,7 +177,7 @@ void main() {
     const userJson = {
       'id': 1,
       'name': 'Andy',
-      'profile': 'andy',
+      'profile': 'user1',
       'color': '#9CC93B',
     };
 
@@ -188,7 +188,7 @@ void main() {
         'isMyDay': true,
         'conflictPhrase': 'Hoy decide Andy.',
       });
-      expect(p.priorityUser.profile, 'andy');
+      expect(p.priorityUser.profile, 'user1');
       expect(p.isMyDay, isTrue);
       expect(DailyPriority.fromJson(p.toJson()).date, '2026-06-04');
     });
@@ -212,16 +212,16 @@ void main() {
   });
 
   group('ExpensesSummary', () {
-    const andyJson = {
+    const user1Json = {
       'id': 1,
       'name': 'Andy',
-      'profile': 'andy',
+      'profile': 'user1',
       'color': '#9CC93B',
     };
-    const dennisJson = {
+    const user2Json = {
       'id': 2,
       'name': 'Dennis',
-      'profile': 'amigo',
+      'profile': 'user2',
       'color': '#FF8A3D',
     };
 
@@ -236,18 +236,18 @@ void main() {
               'amountEur': 25.0,
               'type': 'shared',
               'createdAt': null,
-              'user': dennisJson,
+              'user': user2Json,
             },
           ],
           'totalPerUser': [
-            {'user': andyJson, 'totalEur': 0},
-            {'user': dennisJson, 'totalEur': 25.0},
+            {'user': user1Json, 'totalEur': 0},
+            {'user': user2Json, 'totalEur': 25.0},
           ],
           'balance': {
             'settled': false,
             'amountEur': 12.5,
-            'fromUser': andyJson,
-            'toUser': dennisJson,
+            'fromUser': user1Json,
+            'toUser': user2Json,
           },
         },
         'wash': {
@@ -257,9 +257,9 @@ void main() {
             'date': '2026-05-20',
             'costEur': 15.0,
             'createdAt': null,
-            'user': andyJson,
+            'user': user1Json,
           },
-          'nextWashUser': dennisJson,
+          'nextWashUser': user2Json,
           'history': const [],
         },
       });

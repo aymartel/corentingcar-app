@@ -5,6 +5,7 @@ import '../../common/widgets/app_nav_bar.dart';
 import '../calendar/calendar_screen.dart';
 import '../expenses/expenses_screen.dart';
 import '../mileage/mileage_screen.dart';
+import '../car_status/car_status_controller.dart';
 import '../requests/requests_controller.dart';
 import '../today/today_screen.dart';
 import 'navigation_controller.dart';
@@ -59,6 +60,8 @@ class _AppShellState extends ConsumerState<AppShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.invalidate(pendingRequestsProvider);
+      // F12: refresca el estado real del coche (sin parpadeo) al volver.
+      ref.read(carStatusProvider.notifier).refresh();
     }
   }
 

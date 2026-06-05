@@ -8,7 +8,7 @@ import '../../data/api/api_exception.dart';
 import '../../data/models/models.dart';
 import 'session_controller.dart';
 
-/// Pantalla de LOGIN (Fase F3): elegir perfil (Andy/Amigo) + PIN. **Sin
+/// Pantalla de LOGIN (Fase F3): elegir perfil (Andy/Dennis) + PIN. **Sin
 /// registro**. Estética dark/JEEP (F0). UI en español.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});

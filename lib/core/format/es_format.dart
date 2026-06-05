@@ -43,6 +43,9 @@ abstract final class EsFormat {
   /// Fecha ISO para la API: `"2026-06-04"` (`YYYY-MM-DD`).
   static String apiDate(DateTime date) => DateFormat('yyyy-MM-dd').format(date);
 
+  /// Hora local corta: `"14:35"` (para "libre desde …").
+  static String time(DateTime date) => DateFormat('HH:mm', _l).format(date);
+
   /// Parsea un importe escrito por el usuario (acepta coma o punto decimal).
   /// Si hay coma, se trata como decimal (y el punto como separador de miles).
   /// Devuelve null si no es un número válido.

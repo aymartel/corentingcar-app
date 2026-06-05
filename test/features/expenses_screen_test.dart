@@ -45,7 +45,7 @@ void main() {
     // Saldo de gasolina.
     expect(find.text('SALDO'), findsOneWidget);
     expect(find.textContaining('Andy debe'), findsOneWidget);
-    // Historial: repostaje compartido de Amigo (userId 2).
+    // Historial: repostaje compartido de Dennis (userId 2).
     expect(find.text('COMPARTIDO'), findsOneWidget);
     expect(find.textContaining('25,00'), findsOneWidget);
     // Lavado: último y a quién le toca.

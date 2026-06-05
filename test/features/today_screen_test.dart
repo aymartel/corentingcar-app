@@ -18,6 +18,7 @@ Future<void> _pumpToday(
       overrides: [
         priorityServiceProvider.overrideWithValue(priority),
         requestServiceProvider.overrideWithValue(FakeRequestService()),
+        carStatusServiceProvider.overrideWithValue(FakeCarStatusService()),
       ],
       child: MaterialApp(theme: AppTheme.dark(), home: const TodayScreen()),
     ),
@@ -34,7 +35,7 @@ void main() {
     await _pumpToday(
       tester,
       FakePriorityService(
-        todayResult: priorityFor(andy, conflictPhrase: 'Hoy decide Andy.'),
+        todayResult: priorityFor(user1, conflictPhrase: 'Hoy decide Andy.'),
       ),
     );
 
@@ -52,7 +53,7 @@ void main() {
   testWidgets('si es tu día, marca "ES TU DÍA"', (tester) async {
     await _pumpToday(
       tester,
-      FakePriorityService(todayResult: priorityFor(andy, isMyDay: true)),
+      FakePriorityService(todayResult: priorityFor(user1, isMyDay: true)),
     );
 
     expect(find.text('ES TU DÍA'), findsOneWidget);

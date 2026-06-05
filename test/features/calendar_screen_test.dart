@@ -2,6 +2,7 @@ import 'package:coretingcar/common/theme/theme.dart';
 import 'package:coretingcar/data/api/api_exception.dart';
 import 'package:coretingcar/data/providers.dart';
 import 'package:coretingcar/features/calendar/calendar_screen.dart';
+import 'package:coretingcar/features/login/session_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -53,6 +54,34 @@ void main() {
 
     expect(find.text('PRIORIDAD'), findsOneWidget);
     expect(find.text('Solicitud aceptada'), findsOneWidget);
+  });
+
+  testWidgets('día del otro sin solicitud → "Pedir coche" crea la solicitud', (
+    tester,
+  ) async {
+    final requestService = FakeRequestService();
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          priorityServiceProvider.overrideWithValue(FakePriorityService()),
+          requestServiceProvider.overrideWithValue(requestService),
+          currentUserProvider.overrideWithValue(user1),
+        ],
+        child: MaterialApp(theme: AppTheme.dark(), home: const CalendarScreen()),
+      ),
+    );
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+
+    // Día 2 (par) → prioridad user2 (Dennis) → no es mi día → "Pedir coche".
+    await tester.tap(find.text('2').first);
+    await tester.pumpAndSettle();
+    expect(find.text('Pedir coche'), findsOneWidget);
+
+    await tester.tap(find.text('Pedir coche'));
+    await tester.pumpAndSettle();
+    expect(requestService.createCalls, 1);
   });
 
   testWidgets('navegar de mes recarga los datos', (tester) async {

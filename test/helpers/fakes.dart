@@ -3,14 +3,15 @@ import 'package:coretingcar/data/api/api_exception.dart';
 import 'package:coretingcar/data/api/token_store.dart';
 import 'package:coretingcar/data/models/models.dart';
 import 'package:coretingcar/data/services/auth_service.dart';
+import 'package:coretingcar/data/services/car_status_service.dart';
 import 'package:coretingcar/data/services/expenses_service.dart';
 import 'package:coretingcar/data/services/priority_service.dart';
 import 'package:coretingcar/data/services/request_service.dart';
 import 'package:coretingcar/data/services/rules_service.dart';
 import 'package:coretingcar/data/services/usage_service.dart';
 
-const andy = User(id: 1, name: 'Andy', profile: 'andy', color: '#9CC93B');
-const amigo = User(id: 2, name: 'Dennis', profile: 'amigo', color: '#FF8A3D');
+const user1 = User(id: 1, name: 'Andy', profile: 'user1', color: '#9CC93B');
+const user2 = User(id: 2, name: 'Dennis', profile: 'user2', color: '#FF8A3D');
 
 /// `TokenStore` en memoria para tests (no toca `flutter_secure_storage`).
 class FakeTokenStore extends TokenStore {
@@ -56,7 +57,7 @@ class FakeTokenStore extends TokenStore {
 /// `AuthService` controlable para tests (sin red).
 class FakeAuthService extends AuthService {
   FakeAuthService({
-    this.usersList = const [andy, amigo],
+    this.usersList = const [user1, user2],
     this.meUser,
     this.meError,
     this.loginError,
@@ -132,7 +133,7 @@ class FakePriorityService extends PriorityService {
     calendarCalls++;
     if (calendarError != null) throw calendarError!;
     if (calendarResult != null) return calendarResult!;
-    // Genera el mes alternando andy/amigo, con una cesión el día 15.
+    // Genera el mes alternando user1/user2, con una cesión el día 15.
     final parts = month.split('-');
     final year = int.parse(parts[0]);
     final m = int.parse(parts[1]);
@@ -141,7 +142,7 @@ class FakePriorityService extends PriorityService {
       for (var d = 1; d <= days; d++)
         CalendarDay(
           date: '$month-${d.toString().padLeft(2, '0')}',
-          priorityUser: d.isOdd ? andy : amigo,
+          priorityUser: d.isOdd ? user1 : user2,
           isHandover: d == 15,
           origin: d == 15 ? 'request_accepted' : null,
         ),
@@ -196,6 +197,56 @@ class FakeUsageService extends UsageService {
       totalKm: endKm - startKm,
       type: type,
     );
+  }
+}
+
+/// `CarStatusService` controlable para tests (sin red). Empieza libre.
+class FakeCarStatusService extends CarStatusService {
+  FakeCarStatusService({CarStatus? status, this.setError})
+    : _status = status ?? const CarStatus(availability: CarAvailability.free),
+      super(ApiClient(tokenReader: () async => null));
+
+  CarStatus _status;
+  final ApiException? setError;
+
+  int getCalls = 0;
+  int setCalls = 0;
+  CarAvailability? lastStatus;
+  ParkingSpot? lastParking;
+  String? lastNote;
+
+  @override
+  Future<CarStatus> getStatus() async {
+    await Future<void>.delayed(Duration.zero);
+    getCalls++;
+    return _status;
+  }
+
+  @override
+  Future<CarStatus> setStatus(
+    CarAvailability availability, {
+    ParkingSpot? parking,
+    String? note,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    setCalls++;
+    lastStatus = availability;
+    lastParking = parking;
+    lastNote = note;
+    if (setError != null) throw setError!;
+    _status = CarStatus(
+      availability: availability,
+      user: availability == CarAvailability.taken ? user1 : null,
+      parking: parking,
+      parkingUser: switch (parking) {
+        ParkingSpot.user1 => user1,
+        ParkingSpot.user2 => user2,
+        _ => null, // 'other' o null → sin usuario (la ubicación va en la nota)
+      },
+      note: note,
+      since: DateTime(2026, 6, 4, 14, 30),
+    );
+    return _status;
   }
 }
 
@@ -344,8 +395,8 @@ class FakeRequestService extends RequestService {
   );
 }
 
-/// Solicitudes de muestra para `andy` (id 1): 1 recibida pendiente (de Amigo),
-/// 1 enviada pendiente (a Amigo) y 1 aceptada en el historial.
+/// Solicitudes de muestra para `user1` (id 1): 1 recibida pendiente (de Dennis),
+/// 1 enviada pendiente (a Dennis) y 1 aceptada en el historial.
 List<UseRequest> requestsSample() => const [
   // Recibida por Andy (la pide Dennis).
   UseRequest(
@@ -355,8 +406,8 @@ List<UseRequest> requestsSample() => const [
     useDate: '2026-06-10',
     status: RequestStatus.pending,
     message: '¿Me lo dejas?',
-    requester: amigo,
-    recipient: andy,
+    requester: user2,
+    recipient: user1,
   ),
   // Enviada por Andy.
   UseRequest(
@@ -365,8 +416,8 @@ List<UseRequest> requestsSample() => const [
     recipientId: 2,
     useDate: '2026-06-12',
     status: RequestStatus.pending,
-    requester: andy,
-    recipient: amigo,
+    requester: user1,
+    recipient: user2,
   ),
   // Historial (aceptada).
   UseRequest(
@@ -375,8 +426,8 @@ List<UseRequest> requestsSample() => const [
     recipientId: 2,
     useDate: '2026-05-01',
     status: RequestStatus.accepted,
-    requester: andy,
-    recipient: amigo,
+    requester: user1,
+    recipient: user2,
   ),
 ];
 
@@ -392,30 +443,30 @@ ExpensesSummary expensesSample() => const ExpensesSummary(
           amountEur: 25.0,
           type: EntryType.shared,
         ),
-        user: amigo,
+        user: user2,
       ),
     ],
     totalPerUser: [
-      FuelTotal(user: andy, totalEur: 0),
-      FuelTotal(user: amigo, totalEur: 25.0),
+      FuelTotal(user: user1, totalEur: 0),
+      FuelTotal(user: user2, totalEur: 25.0),
     ],
     balance: FuelBalance(
       settled: false,
       amountEur: 12.5,
-      fromUser: andy,
-      toUser: amigo,
+      fromUser: user1,
+      toUser: user2,
     ),
   ),
   wash: WashSection(
     last: WashEntry(
       log: WashLog(id: 9, userId: 1, date: '2026-05-20', costEur: 15.0),
-      user: andy,
+      user: user1,
     ),
-    nextWashUser: amigo,
+    nextWashUser: user2,
     history: [
       WashEntry(
         log: WashLog(id: 9, userId: 1, date: '2026-05-20', costEur: 15.0),
-        user: andy,
+        user: user1,
       ),
     ],
   ),
@@ -425,7 +476,7 @@ ExpensesSummary expensesSample() => const ExpensesSummary(
 MileageSummary mileageSample() => const MileageSummary(
   people: [
     PersonMileage(
-      user: andy,
+      user: user1,
       individualKm: 6240,
       usedKm: 6240,
       remainingKm: 1760,
@@ -433,7 +484,7 @@ MileageSummary mileageSample() => const MileageSummary(
       excessKm: 0,
     ),
     PersonMileage(
-      user: amigo,
+      user: user2,
       individualKm: 8430,
       usedKm: 8430,
       remainingKm: 0,

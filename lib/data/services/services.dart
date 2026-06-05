@@ -3,6 +3,7 @@
 library;
 
 export 'auth_service.dart';
+export 'car_status_service.dart';
 export 'expenses_service.dart';
 export 'priority_service.dart';
 export 'request_service.dart';

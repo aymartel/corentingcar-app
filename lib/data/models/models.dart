@@ -3,6 +3,7 @@
 library;
 
 export 'calendar_day.dart';
+export 'car_status.dart';
 export 'daily_priority.dart';
 export 'entry_type.dart';
 export 'expenses_summary.dart';

@@ -20,7 +20,7 @@ class PersonAvatar extends StatelessWidget {
   /// Nombre visible (de él se toma la inicial). UI en español.
   final String name;
 
-  /// Perfil estable: `'andy'` | `'amigo'` (define el color canónico).
+  /// Perfil estable: `'user1'` | `'user2'` (define el color canónico).
   final String profile;
 
   /// Color explícito (p.ej. `users.color` del backend). Si es null usa

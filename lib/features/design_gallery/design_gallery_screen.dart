@@ -50,14 +50,14 @@ class DesignGalleryScreen extends StatelessWidget {
               SizedBox(height: AppSpacing.md),
               _MileageBar(
                 name: 'Andy',
-                profile: 'andy',
+                profile: 'user1',
                 used: 6240,
                 limit: 8000,
               ),
               SizedBox(height: AppSpacing.md),
               _MileageBar(
-                name: 'Amigo',
-                profile: 'amigo',
+                name: 'Dennis',
+                profile: 'user2',
                 used: 8430,
                 limit: 8000,
               ),
@@ -122,7 +122,7 @@ class _PriorityHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final color = personColor('andy');
+    final color = personColor('user1');
     return DecoratedBox(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -135,7 +135,7 @@ class _PriorityHero extends StatelessWidget {
         padding: const EdgeInsets.all(AppSpacing.xl),
         child: Row(
           children: [
-            const PersonAvatar(name: 'Andy', profile: 'andy', size: 64),
+            const PersonAvatar(name: 'Andy', profile: 'user1', size: 64),
             const SizedBox(width: AppSpacing.lg),
             Expanded(
               child: Column(
@@ -334,9 +334,9 @@ class _PeopleRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        _personChip(context, 'Andy', 'andy'),
+        _personChip(context, 'Andy', 'user1'),
         const SizedBox(width: AppSpacing.md),
-        _personChip(context, 'Amigo', 'amigo'),
+        _personChip(context, 'Dennis', 'user2'),
         const Spacer(),
         _badge(),
       ],

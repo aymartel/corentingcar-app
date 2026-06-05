@@ -24,7 +24,7 @@ Future<void> _pumpRules(
         rulesServiceProvider.overrideWithValue(
           FakeRulesService(result: rulesSample()),
         ),
-        currentUserProvider.overrideWithValue(andy),
+        currentUserProvider.overrideWithValue(user1),
         tokenStoreProvider.overrideWithValue(tokenStore),
         authServiceProvider.overrideWithValue(FakeAuthService()),
       ],
@@ -60,7 +60,7 @@ void main() {
   });
 
   testWidgets('cerrar sesión limpia el token persistido', (tester) async {
-    final store = FakeTokenStore(token: 't', user: andy);
+    final store = FakeTokenStore(token: 't', user: user1);
     await _pumpRules(tester, tokenStore: store);
 
     expect(await store.readToken(), 't');

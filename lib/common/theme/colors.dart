@@ -33,7 +33,7 @@ abstract final class AppColors {
   /// Oliva — verde apagado: bordes sutiles, fondos de chip, tracks.
   static const Color brandDeep = Color(0xFF5C6B2E);
 
-  /// Ámbar Trail — acento secundario, badges, Amigo.
+  /// Ámbar Trail — acento secundario, badges, Dennis.
   static const Color accentAmber = Color(0xFFFF8A3D);
 
   // --- Texto ---
@@ -64,23 +64,23 @@ abstract final class AppColors {
 
   // --- Colores por persona (canónicos) ---
   /// Andy — verde JEEP (= [brand]).
-  static const Color andy = brand;
+  static const Color user1 = brand;
 
-  /// Amigo — ámbar (= [accentAmber]).
-  static const Color amigo = accentAmber;
+  /// Dennis — ámbar (= [accentAmber]).
+  static const Color user2 = accentAmber;
 }
 
-/// Color de marca de una persona a partir de su `profile` (`'andy'`/`'amigo'`).
+/// Color de marca de una persona a partir de su `profile` (`'user1'`/`'user2'`).
 ///
 /// Si el backend envía `users.color`, la UI lo respeta; este helper es el
 /// fallback canónico (y la fuente de verdad de los hex sembrados en B2).
 Color personColor(String profile) {
   switch (profile.toLowerCase()) {
-    case 'amigo':
-      return AppColors.amigo;
-    case 'andy':
+    case 'user2':
+      return AppColors.user2;
+    case 'user1':
     default:
-      return AppColors.andy;
+      return AppColors.user1;
   }
 }
 

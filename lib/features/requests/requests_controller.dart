@@ -17,6 +17,11 @@ class RequestsController extends AsyncNotifier<List<UseRequest>> {
     );
   }
 
+  /// Pide el coche para un día (crea una solicitud pendiente). No cambia la
+  /// prioridad (solo al aceptarse).
+  Future<void> requestDay(String useDate) =>
+      _act(() => ref.read(requestServiceProvider).create(useDate: useDate));
+
   /// Acepta (solo el de prioridad): crea una cesión → refresca HOY y CALENDARIO.
   Future<void> accept(int id) => _act(
     () => ref.read(requestServiceProvider).accept(id),
