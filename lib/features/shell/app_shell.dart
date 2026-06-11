@@ -8,6 +8,7 @@ import '../mileage/mileage_screen.dart';
 import '../car_status/car_status_controller.dart';
 import '../requests/requests_controller.dart';
 import '../today/today_screen.dart';
+import '../usage_history/usage_history_controller.dart';
 import 'navigation_controller.dart';
 
 /// Las 4 pestañas del shell, con etiquetas en español (Fase F1).
@@ -60,6 +61,7 @@ class _AppShellState extends ConsumerState<AppShell>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       ref.invalidate(pendingRequestsProvider);
+      ref.invalidate(pendingUsageChangesProvider);
       // F12: refresca el estado real del coche (sin parpadeo) al volver.
       ref.read(carStatusProvider.notifier).refresh();
     }

@@ -4,6 +4,7 @@ import '../../data/models/models.dart';
 import '../../data/providers.dart';
 import '../calendar/calendar_controller.dart';
 import '../today/today_controller.dart';
+import '../usage_history/usage_history_controller.dart';
 
 /// Lista de solicitudes de uso (Fase F8). Estados:
 /// `pending → accepted | rejected | cancelled`. Avisos **solo in-app**.
@@ -62,7 +63,10 @@ final pendingRequestsProvider = FutureProvider<List<UseRequest>>(
   (ref) => ref.watch(requestServiceProvider).pending(),
 );
 
-/// Nº de pendientes que requieren acción del usuario (para el badge).
+/// Nº de pendientes que requieren acción del usuario (para el badge): solicitudes
+/// de uso recibidas + cambios de uso (historial) pendientes de su aprobación.
 final pendingCountProvider = Provider<int>(
-  (ref) => ref.watch(pendingRequestsProvider).asData?.value.length ?? 0,
+  (ref) =>
+      (ref.watch(pendingRequestsProvider).asData?.value.length ?? 0) +
+      (ref.watch(pendingUsageChangesProvider).asData?.value.length ?? 0),
 );

@@ -8,6 +8,8 @@ import '../../core/format/es_format.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/models/models.dart';
 import '../login/session_controller.dart';
+import '../usage_history/usage_change_card.dart';
+import '../usage_history/usage_history_controller.dart';
 import 'request_form.dart';
 import 'requests_controller.dart';
 
@@ -70,7 +72,14 @@ class _RequestsList extends ConsumerWidget {
         .toList();
     final history = requests.where((r) => !r.status.isPending).toList();
 
-    if (requests.isEmpty) {
+    // Cambios de uso (historial) pendientes de la aprobación del usuario.
+    final usageChanges =
+        ref.watch(usageChangesControllerProvider).asData?.value ?? const [];
+    final pendingChanges = usageChanges
+        .where((c) => c.status.isPending && c.recipientId == myUserId)
+        .toList();
+
+    if (requests.isEmpty && pendingChanges.isEmpty) {
       return const RefreshableCenter(
         child: EmptyView(message: 'No hay solicitudes todavía.'),
       );
@@ -80,6 +89,32 @@ class _RequestsList extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
+        if (pendingChanges.isNotEmpty) ...[
+          Text('CAMBIOS DE USO · PENDIENTES', style: AppTypography.hudLabel()),
+          const SizedBox(height: AppSpacing.md),
+          for (final change in pendingChanges)
+            UsageChangeCard(
+              change: change,
+              myUserId: myUserId,
+              onApprove: () => _act(
+                context,
+                ref,
+                () => ref
+                    .read(usageChangesControllerProvider.notifier)
+                    .approve(change.id),
+                'Cambio aprobado.',
+              ),
+              onReject: () => _act(
+                context,
+                ref,
+                () => ref
+                    .read(usageChangesControllerProvider.notifier)
+                    .reject(change.id),
+                'Cambio rechazado.',
+              ),
+            ),
+          const SizedBox(height: AppSpacing.lg),
+        ],
         if (received.isNotEmpty) ...[
           Text('PENDIENTES · RECIBIDAS', style: AppTypography.hudLabel()),
           const SizedBox(height: AppSpacing.md),

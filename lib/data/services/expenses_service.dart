@@ -32,4 +32,23 @@ class ExpensesService {
     );
     return WashLog.fromJson(asMap(data));
   }
+
+  /// `POST /api/other-expenses` `{ date, amountEur, type, description }`.
+  Future<OtherExpenseLog> addOtherExpense({
+    required String date,
+    required double amountEur,
+    required EntryType type,
+    required String description,
+  }) async {
+    final data = await _api.post(
+      '/other-expenses',
+      body: {
+        'date': date,
+        'amountEur': amountEur,
+        'type': type.toJson(),
+        'description': description,
+      },
+    );
+    return OtherExpenseLog.fromJson(asMap(data));
+  }
 }

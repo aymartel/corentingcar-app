@@ -228,7 +228,7 @@ class _ActionGrid extends StatelessWidget {
         _ActionTile(
           icon: Icons.speed_outlined,
           label: 'Registrar uso',
-          onTap: () => _handle(context, openUsageForm, 'Uso registrado.'),
+          onTap: () => handleUsageForm(context),
         ),
         _ActionTile(
           icon: Icons.local_gas_station_outlined,

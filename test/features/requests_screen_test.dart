@@ -3,6 +3,7 @@ import 'package:coretingcar/data/providers.dart';
 import 'package:coretingcar/features/login/session_controller.dart';
 import 'package:coretingcar/features/requests/requests_controller.dart';
 import 'package:coretingcar/features/requests/requests_screen.dart';
+import 'package:coretingcar/features/usage_history/usage_history_controller.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -23,6 +24,7 @@ Future<void> _pumpRequests(
     ProviderScope(
       overrides: [
         requestServiceProvider.overrideWithValue(requests),
+        usageChangeServiceProvider.overrideWithValue(FakeUsageChangeService()),
         currentUserProvider.overrideWithValue(user1),
       ],
       child: MaterialApp(theme: AppTheme.dark(), home: const RequestsScreen()),
@@ -65,7 +67,7 @@ void main() {
     expect(requests.acceptCalls, 1);
   });
 
-  test('pendingCountProvider cuenta las pendientes', () async {
+  test('pendingCountProvider suma solicitudes + cambios de uso pendientes', () async {
     final container = ProviderContainer(
       overrides: [
         requestServiceProvider.overrideWithValue(
@@ -75,12 +77,22 @@ void main() {
                 .toList(),
           ),
         ),
+        usageChangeServiceProvider.overrideWithValue(
+          FakeUsageChangeService(
+            pendingResult: usageChangesSample()
+                .where((c) => c.recipientId == 1 && c.status.isPending)
+                .toList(),
+          ),
+        ),
       ],
     );
     addTearDown(container.dispose);
     container.listen(pendingRequestsProvider, (_, _) {});
+    container.listen(pendingUsageChangesProvider, (_, _) {});
     await container.read(pendingRequestsProvider.future);
+    await container.read(pendingUsageChangesProvider.future);
 
-    expect(container.read(pendingCountProvider), 1);
+    // 1 solicitud recibida + 1 cambio de uso entrante pendiente = 2.
+    expect(container.read(pendingCountProvider), 2);
   });
 }

@@ -7,6 +7,7 @@ import '../../common/widgets/brand/brand.dart';
 import '../../common/widgets/glow_card.dart';
 import '../../core/format/es_format.dart';
 import '../../data/models/models.dart';
+import '../usage_history/usage_history_screen.dart';
 import 'mileage_controller.dart';
 
 /// Pantalla KILÓMETROS (Fase F6): consumo del año por persona (límite 8.000),
@@ -20,7 +21,20 @@ class MileageScreen extends ConsumerWidget {
     final controller = ref.read(mileageControllerProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('KILÓMETROS')),
+      appBar: AppBar(
+        title: const Text('KILÓMETROS'),
+        actions: [
+          IconButton(
+            tooltip: 'Historial de usos',
+            icon: const Icon(Icons.history),
+            onPressed: () => Navigator.of(context).push(
+              MaterialPageRoute<void>(
+                builder: (_) => const UsageHistoryScreen(),
+              ),
+            ),
+          ),
+        ],
+      ),
       body: RefreshIndicator(
         color: AppColors.brand,
         backgroundColor: AppColors.surface,

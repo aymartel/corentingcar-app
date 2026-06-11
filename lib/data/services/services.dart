@@ -8,4 +8,5 @@ export 'expenses_service.dart';
 export 'priority_service.dart';
 export 'request_service.dart';
 export 'rules_service.dart';
+export 'usage_change_service.dart';
 export 'usage_service.dart';

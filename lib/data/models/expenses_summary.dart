@@ -1,5 +1,6 @@
 import 'fuel_log.dart';
 import 'json_utils.dart';
+import 'other_expense_log.dart';
 import 'user.dart';
 import 'wash_log.dart';
 
@@ -12,6 +13,21 @@ class FuelEntry {
 
   factory FuelEntry.fromJson(JsonMap json) => FuelEntry(
     log: FuelLog.fromJson(json),
+    user: User.fromJson(asMap(json['user'])),
+  );
+
+  JsonMap toJson() => {...log.toJson(), 'user': user.toJson()};
+}
+
+/// Otro gasto con la persona que pagó (entrada del historial de otros gastos).
+class OtherExpenseEntry {
+  const OtherExpenseEntry({required this.log, required this.user});
+
+  final OtherExpenseLog log;
+  final User user;
+
+  factory OtherExpenseEntry.fromJson(JsonMap json) => OtherExpenseEntry(
+    log: OtherExpenseLog.fromJson(json),
     user: User.fromJson(asMap(json['user'])),
   );
 
@@ -33,14 +49,14 @@ class WashEntry {
   JsonMap toJson() => {...log.toJson(), 'user': user.toJson()};
 }
 
-/// Total de gasolina pagado por una persona.
-class FuelTotal {
-  const FuelTotal({required this.user, required this.totalEur});
+/// Total de gasto pagado por una persona (gasolina u otros).
+class ExpenseTotal {
+  const ExpenseTotal({required this.user, required this.totalEur});
 
   final User user;
   final double totalEur;
 
-  factory FuelTotal.fromJson(JsonMap json) => FuelTotal(
+  factory ExpenseTotal.fromJson(JsonMap json) => ExpenseTotal(
     user: User.fromJson(asMap(json['user'])),
     totalEur: jDouble(json['totalEur']),
   );
@@ -48,9 +64,9 @@ class FuelTotal {
   JsonMap toJson() => {'user': user.toJson(), 'totalEur': totalEur};
 }
 
-/// Saldo de gasolina entre las dos personas: quién debe a quién.
-class FuelBalance {
-  const FuelBalance({
+/// Saldo entre las dos personas: quién debe a quién. Combina gasolina + otros.
+class ExpenseBalance {
+  const ExpenseBalance({
     required this.settled,
     required this.amountEur,
     this.fromUser,
@@ -65,7 +81,7 @@ class FuelBalance {
   final User? fromUser;
   final User? toUser;
 
-  factory FuelBalance.fromJson(JsonMap json) => FuelBalance(
+  factory ExpenseBalance.fromJson(JsonMap json) => ExpenseBalance(
     settled: jBool(json['settled']),
     amountEur: jDouble(json['amountEur']),
     fromUser: json['fromUser'] == null
@@ -84,7 +100,8 @@ class FuelBalance {
   };
 }
 
-/// Sección de gasolina del resumen de gastos.
+/// Sección de gasolina del resumen de gastos. `balance` es el saldo combinado
+/// (gasolina + otros), mantenido aquí como alias para compatibilidad.
 class FuelSection {
   const FuelSection({
     required this.list,
@@ -93,21 +110,45 @@ class FuelSection {
   });
 
   final List<FuelEntry> list;
-  final List<FuelTotal> totalPerUser;
-  final FuelBalance balance;
+  final List<ExpenseTotal> totalPerUser;
+  final ExpenseBalance balance;
 
   factory FuelSection.fromJson(JsonMap json) => FuelSection(
     list: asMapList(json['list']).map(FuelEntry.fromJson).toList(),
     totalPerUser: asMapList(
       json['totalPerUser'],
-    ).map(FuelTotal.fromJson).toList(),
-    balance: FuelBalance.fromJson(asMap(json['balance'])),
+    ).map(ExpenseTotal.fromJson).toList(),
+    balance: ExpenseBalance.fromJson(asMap(json['balance'])),
   );
 
   JsonMap toJson() => {
     'list': list.map((e) => e.toJson()).toList(),
     'totalPerUser': totalPerUser.map((t) => t.toJson()).toList(),
     'balance': balance.toJson(),
+  };
+}
+
+/// Sección de otros gastos del resumen.
+class OtherSection {
+  const OtherSection({required this.list, required this.totalPerUser});
+
+  final List<OtherExpenseEntry> list;
+  final List<ExpenseTotal> totalPerUser;
+
+  /// Sección vacía (backend antiguo sin la clave `other`).
+  factory OtherSection.empty() =>
+      const OtherSection(list: [], totalPerUser: []);
+
+  factory OtherSection.fromJson(JsonMap json) => OtherSection(
+    list: asMapList(json['list']).map(OtherExpenseEntry.fromJson).toList(),
+    totalPerUser: asMapList(
+      json['totalPerUser'],
+    ).map(ExpenseTotal.fromJson).toList(),
+  );
+
+  JsonMap toJson() => {
+    'list': list.map((e) => e.toJson()).toList(),
+    'totalPerUser': totalPerUser.map((t) => t.toJson()).toList(),
   };
 }
 
@@ -136,17 +177,40 @@ class WashSection {
   };
 }
 
-/// Resumen de gastos (Fase F7). `GET /api/expenses`.
+/// Resumen de gastos (Fase F7). `GET /api/expenses`. `balance` es el saldo
+/// combinado (gasolina + otros). Tolerante a backend antiguo: si falta `other`
+/// la sección queda vacía y si falta `balance` cae al alias `fuel.balance`.
 class ExpensesSummary {
-  const ExpensesSummary({required this.fuel, required this.wash});
+  const ExpensesSummary({
+    required this.fuel,
+    required this.other,
+    required this.balance,
+    required this.wash,
+  });
 
   final FuelSection fuel;
+  final OtherSection other;
+  final ExpenseBalance balance;
   final WashSection wash;
 
-  factory ExpensesSummary.fromJson(JsonMap json) => ExpensesSummary(
-    fuel: FuelSection.fromJson(asMap(json['fuel'])),
-    wash: WashSection.fromJson(asMap(json['wash'])),
-  );
+  factory ExpensesSummary.fromJson(JsonMap json) {
+    final fuel = FuelSection.fromJson(asMap(json['fuel']));
+    return ExpensesSummary(
+      fuel: fuel,
+      other: json['other'] == null
+          ? OtherSection.empty()
+          : OtherSection.fromJson(asMap(json['other'])),
+      balance: json['balance'] == null
+          ? fuel.balance
+          : ExpenseBalance.fromJson(asMap(json['balance'])),
+      wash: WashSection.fromJson(asMap(json['wash'])),
+    );
+  }
 
-  JsonMap toJson() => {'fuel': fuel.toJson(), 'wash': wash.toJson()};
+  JsonMap toJson() => {
+    'fuel': fuel.toJson(),
+    'other': other.toJson(),
+    'balance': balance.toJson(),
+    'wash': wash.toJson(),
+  };
 }

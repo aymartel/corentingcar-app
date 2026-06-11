@@ -101,17 +101,17 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# --- Icono de la app (foto del Jeep sobre negro de marca) ---
-# Origen: assets/brand/Jeep.png (transparente). Generar:
-# dart run flutter_launcher_icons
+# --- Icono de la app (Jeep sobre blanco con ondas verdes y sombras grises) ---
+# Origen: assets/brand/Jeep.png (transparente). Regenerar el PNG con
+# `python assets/brand/_build_icon.py` y luego `dart run flutter_launcher_icons`.
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/brand/icon.png"
-  adaptive_icon_background: "#0A0B09" # negro de marca; el coche resalta con el halo verde
+  adaptive_icon_background: "#FFFFFF" # fondo blanco; el coche resalta con el halo verde
   adaptive_icon_foreground: "assets/brand/icon_foreground.png"
   remove_alpha_ios: true # iOS no admite alfa en el icono
-  background_color_ios: "#0A0B09"
+  background_color_ios: "#FFFFFF"
   min_sdk_android: 21
 
 # --- Splash de arranque: foto del Jeep sobre negro de marca ---

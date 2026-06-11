@@ -225,7 +225,7 @@ void main() {
       'color': '#FF8A3D',
     };
 
-    test('parsea fuel (list/totalPerUser/balance) y wash', () {
+    test('parsea fuel, other, balance combinado y wash', () {
       final exp = ExpensesSummary.fromJson({
         'fuel': {
           'list': [
@@ -243,12 +243,37 @@ void main() {
             {'user': user1Json, 'totalEur': 0},
             {'user': user2Json, 'totalEur': 25.0},
           ],
+          // Alias del combinado (mismo valor que el top-level).
           'balance': {
             'settled': false,
-            'amountEur': 12.5,
+            'amountEur': 8.5,
             'fromUser': user1Json,
             'toUser': user2Json,
           },
+        },
+        'other': {
+          'list': [
+            {
+              'id': 3,
+              'userId': 1,
+              'date': '2026-06-05',
+              'amountEur': 8.0,
+              'type': 'shared',
+              'description': 'Peaje AP-7',
+              'createdAt': null,
+              'user': user1Json,
+            },
+          ],
+          'totalPerUser': [
+            {'user': user1Json, 'totalEur': 8.0},
+            {'user': user2Json, 'totalEur': 0},
+          ],
+        },
+        'balance': {
+          'settled': false,
+          'amountEur': 8.5,
+          'fromUser': user1Json,
+          'toUser': user2Json,
         },
         'wash': {
           'last': {
@@ -264,14 +289,48 @@ void main() {
         },
       });
 
-      expect(exp.fuel.balance.amountEur, 12.5);
-      expect(exp.fuel.balance.fromUser?.name, 'Andy');
+      // Saldo combinado top-level + alias en fuel.balance.
+      expect(exp.balance.amountEur, 8.5);
+      expect(exp.balance.fromUser?.name, 'Andy');
+      expect(exp.fuel.balance.amountEur, 8.5);
+      // Sección de gasolina.
       expect(exp.fuel.list, hasLength(1));
       expect(exp.fuel.list.first.user.name, 'Dennis');
       expect(exp.fuel.list.first.log.type, EntryType.shared);
+      // Sección de otros gastos.
+      expect(exp.other.list, hasLength(1));
+      expect(exp.other.list.first.log.description, 'Peaje AP-7');
+      expect(exp.other.list.first.user.name, 'Andy');
+      expect(exp.other.totalPerUser.first.totalEur, 8.0);
+      // Lavado.
       expect(exp.wash.nextWashUser.name, 'Dennis');
       expect(exp.wash.last?.log.costEur, 15.0);
       expect(exp.wash.history, isEmpty);
+
+      // Round-trip completo.
+      expect(ExpensesSummary.fromJson(exp.toJson()).balance.amountEur, 8.5);
+    });
+
+    test('compatibilidad: backend antiguo sin "other" ni "balance"', () {
+      final exp = ExpensesSummary.fromJson({
+        'fuel': {
+          'list': const [],
+          'totalPerUser': const [],
+          'balance': {
+            'settled': false,
+            'amountEur': 12.5,
+            'fromUser': user1Json,
+            'toUser': user2Json,
+          },
+        },
+        'wash': {'last': null, 'nextWashUser': user2Json, 'history': const []},
+      });
+
+      // No lanza: sección de otros vacía y balance cae al alias de fuel.
+      expect(exp.other.list, isEmpty);
+      expect(exp.other.totalPerUser, isEmpty);
+      expect(exp.balance.amountEur, exp.fuel.balance.amountEur);
+      expect(exp.balance.amountEur, 12.5);
     });
   });
 }

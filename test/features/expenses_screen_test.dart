@@ -36,18 +36,27 @@ Future<void> _pumpExpenses(
 void main() {
   setUpAll(() => initializeDateFormatting('es_ES'));
 
-  testWidgets('muestra saldo de gasolina, historial y lavado', (tester) async {
+  testWidgets('muestra saldo combinado, gasolina, otros y lavado', (
+    tester,
+  ) async {
     await _pumpExpenses(
       tester,
       FakeExpensesService(summaryResult: expensesSample()),
     );
 
-    // Saldo de gasolina.
+    // Acciones: las 4, incluyendo el nuevo "OTRO".
+    expect(find.text('OTRO'), findsOneWidget);
+
+    // Saldo combinado (8,50 €): Andy debe a Dennis. Aparece en frase + odómetro.
     expect(find.text('SALDO'), findsOneWidget);
     expect(find.textContaining('Andy debe'), findsOneWidget);
-    // Historial: repostaje compartido de Dennis (userId 2).
-    expect(find.text('COMPARTIDO'), findsOneWidget);
+    expect(find.textContaining('8,50'), findsWidgets);
+    // Historial de gasolina (Dennis, 25 €) y de otros (Peaje, 8 €): 2 chips COMPARTIDO.
+    expect(find.text('COMPARTIDO'), findsNWidgets(2));
     expect(find.textContaining('25,00'), findsOneWidget);
+    // Sección OTROS.
+    expect(find.text('OTROS'), findsOneWidget);
+    expect(find.text('Peaje AP-7'), findsOneWidget);
     // Lavado: último y a quién le toca.
     expect(find.text('ÚLTIMO LAVADO'), findsOneWidget);
     expect(find.text('LE TOCA A'), findsOneWidget);

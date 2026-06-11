@@ -12,7 +12,7 @@ import '../helpers/fakes.dart';
 /// Monta un botón que abre el formulario indicado (como hacen HOY/GASTOS).
 Future<void> _pumpLauncher(
   WidgetTester tester, {
-  required Future<bool?> Function(BuildContext) opener,
+  required Future<Object?> Function(BuildContext) opener,
   FakeExpensesService? expenses,
   FakeUsageService? usage,
 }) async {
@@ -65,6 +65,42 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(expenses.fuelCalls, 1);
+    expect(find.text('GUARDAR'), findsNothing); // el sheet se cerró
+  });
+
+  testWidgets('otro gasto: descripción vacía no envía', (tester) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(
+      tester,
+      opener: openOtherExpenseForm,
+      expenses: expenses,
+    );
+
+    // Solo importe, sin descripción → validación, no se llama al servicio.
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(1), '15'); // importe
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pump();
+
+    expect(find.text('Descripción obligatoria'), findsOneWidget);
+    expect(expenses.otherCalls, 0);
+  });
+
+  testWidgets('otro gasto: válido envía y cierra', (tester) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(
+      tester,
+      opener: openOtherExpenseForm,
+      expenses: expenses,
+    );
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), 'Peaje AP-7'); // descripción
+    await tester.enterText(fields.at(1), '15'); // importe
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(expenses.otherCalls, 1);
     expect(find.text('GUARDAR'), findsNothing); // el sheet se cerró
   });
 

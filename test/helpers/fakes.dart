@@ -8,6 +8,7 @@ import 'package:coretingcar/data/services/expenses_service.dart';
 import 'package:coretingcar/data/services/priority_service.dart';
 import 'package:coretingcar/data/services/request_service.dart';
 import 'package:coretingcar/data/services/rules_service.dart';
+import 'package:coretingcar/data/services/usage_change_service.dart';
 import 'package:coretingcar/data/services/usage_service.dart';
 
 const user1 = User(id: 1, name: 'Andy', profile: 'user1', color: '#9CC93B');
@@ -156,11 +157,19 @@ class FakeUsageService extends UsageService {
     this.mileageResult,
     this.mileageError,
     this.usageList = const [],
+    this.createError,
+    this.failList = false,
   }) : super(ApiClient(tokenReader: () async => null));
 
   final MileageSummary? mileageResult;
   final ApiException? mileageError;
   final List<UsageLog> usageList;
+
+  /// Si se indica, `create` lo lanza (p.ej. `ODOMETER_INCONSISTENT` por carrera).
+  final ApiException? createError;
+
+  /// Si es `true`, `list` lanza (para probar el estado de error del historial).
+  final bool failList;
 
   int mileageCalls = 0;
   int createCalls = 0;
@@ -168,6 +177,7 @@ class FakeUsageService extends UsageService {
   @override
   Future<List<UsageLog>> list({int? userId, String? from, String? to}) async {
     await Future<void>.delayed(Duration.zero);
+    if (failList) throw Exception('boom');
     return usageList;
   }
 
@@ -188,6 +198,7 @@ class FakeUsageService extends UsageService {
   }) async {
     await Future<void>.delayed(Duration.zero);
     createCalls++;
+    if (createError != null) throw createError!;
     return UsageLog(
       id: 1,
       userId: 1,
@@ -198,6 +209,146 @@ class FakeUsageService extends UsageService {
       type: type,
     );
   }
+}
+
+/// `UsageChangeService` controlable para tests (sin red).
+class FakeUsageChangeService extends UsageChangeService {
+  FakeUsageChangeService({
+    this.listResult = const [],
+    this.pendingResult = const [],
+    this.proposeError,
+  }) : super(ApiClient(tokenReader: () async => null));
+
+  List<UsageChange> listResult;
+  List<UsageChange> pendingResult;
+
+  /// Si se indica, los `proposeX` lo lanzan (p.ej. solape al proponer).
+  final ApiException? proposeError;
+
+  int approveCalls = 0;
+  int rejectCalls = 0;
+  int cancelCalls = 0;
+  int proposeCreateCalls = 0;
+  int proposeUpdateCalls = 0;
+  int proposeDeleteCalls = 0;
+
+  @override
+  Future<List<UsageChange>> list({UsageChangeStatus? status}) async {
+    await Future<void>.delayed(Duration.zero);
+    return listResult;
+  }
+
+  @override
+  Future<List<UsageChange>> pending() async {
+    await Future<void>.delayed(Duration.zero);
+    return pendingResult;
+  }
+
+  @override
+  Future<UsageChange> proposeCreate({
+    required String date,
+    required int startKm,
+    required int endKm,
+    required EntryType type,
+    String? reason,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    proposeCreateCalls++;
+    if (proposeError != null) throw proposeError!;
+    return _pending(
+      UsageChangeKind.create,
+      proposed: UsageChangeFields(
+        userId: 1,
+        date: date,
+        startKm: startKm,
+        endKm: endKm,
+        type: type,
+      ),
+    );
+  }
+
+  @override
+  Future<UsageChange> proposeUpdate({
+    required int usageId,
+    required String date,
+    required int startKm,
+    required int endKm,
+    required EntryType type,
+    String? reason,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    proposeUpdateCalls++;
+    if (proposeError != null) throw proposeError!;
+    return _pending(
+      UsageChangeKind.update,
+      usageId: usageId,
+      proposed: UsageChangeFields(
+        userId: 1,
+        date: date,
+        startKm: startKm,
+        endKm: endKm,
+        type: type,
+      ),
+    );
+  }
+
+  @override
+  Future<UsageChange> proposeDelete({
+    required int usageId,
+    String? reason,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    proposeDeleteCalls++;
+    if (proposeError != null) throw proposeError!;
+    return _pending(UsageChangeKind.delete, usageId: usageId);
+  }
+
+  @override
+  Future<UsageChange> approve(int id) async {
+    await Future<void>.delayed(Duration.zero);
+    approveCalls++;
+    return _resolved(id, UsageChangeStatus.approved);
+  }
+
+  @override
+  Future<UsageChange> reject(int id) async {
+    await Future<void>.delayed(Duration.zero);
+    rejectCalls++;
+    return _resolved(id, UsageChangeStatus.rejected);
+  }
+
+  @override
+  Future<UsageChange> cancel(int id) async {
+    await Future<void>.delayed(Duration.zero);
+    cancelCalls++;
+    return _resolved(id, UsageChangeStatus.cancelled);
+  }
+
+  UsageChange _pending(
+    UsageChangeKind kind, {
+    int? usageId,
+    UsageChangeFields? proposed,
+  }) => UsageChange(
+    id: 50,
+    kind: kind,
+    requesterId: 1,
+    recipientId: 2,
+    status: UsageChangeStatus.pending,
+    usageId: usageId,
+    proposed: proposed,
+    requester: user1,
+    recipient: user2,
+  );
+
+  UsageChange _resolved(int id, UsageChangeStatus status) => UsageChange(
+    id: id,
+    kind: UsageChangeKind.update,
+    requesterId: 1,
+    recipientId: 2,
+    status: status,
+    requester: user1,
+    recipient: user2,
+  );
 }
 
 /// `CarStatusService` controlable para tests (sin red). Empieza libre.
@@ -260,6 +411,7 @@ class FakeExpensesService extends ExpensesService {
 
   int fuelCalls = 0;
   int washCalls = 0;
+  int otherCalls = 0;
 
   @override
   Future<ExpensesSummary> summary() async {
@@ -290,6 +442,25 @@ class FakeExpensesService extends ExpensesService {
     await Future<void>.delayed(Duration.zero);
     washCalls++;
     return WashLog(id: 1, userId: 1, date: date, costEur: costEur);
+  }
+
+  @override
+  Future<OtherExpenseLog> addOtherExpense({
+    required String date,
+    required double amountEur,
+    required EntryType type,
+    required String description,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    otherCalls++;
+    return OtherExpenseLog(
+      id: 1,
+      userId: 1,
+      date: date,
+      amountEur: amountEur,
+      type: type,
+      description: description,
+    );
   }
 }
 
@@ -431,7 +602,9 @@ List<UseRequest> requestsSample() => const [
   ),
 ];
 
-/// Resumen de gastos de muestra: saldo y un repostaje compartido + un lavado.
+/// Resumen de gastos de muestra: un repostaje compartido (Dennis, 25 €) + un
+/// "otro" compartido (Andy, 8 €) + un lavado. El saldo combinado (8,50 €) difiere
+/// del de solo-gasolina (12,50 €): Andy paga el peaje, reduciendo lo que debe.
 ExpensesSummary expensesSample() => const ExpensesSummary(
   fuel: FuelSection(
     list: [
@@ -447,15 +620,41 @@ ExpensesSummary expensesSample() => const ExpensesSummary(
       ),
     ],
     totalPerUser: [
-      FuelTotal(user: user1, totalEur: 0),
-      FuelTotal(user: user2, totalEur: 25.0),
+      ExpenseTotal(user: user1, totalEur: 0),
+      ExpenseTotal(user: user2, totalEur: 25.0),
     ],
-    balance: FuelBalance(
+    // `fuel.balance` es alias del combinado (ver ExpensesSummary).
+    balance: ExpenseBalance(
       settled: false,
-      amountEur: 12.5,
+      amountEur: 8.5,
       fromUser: user1,
       toUser: user2,
     ),
+  ),
+  other: OtherSection(
+    list: [
+      OtherExpenseEntry(
+        log: OtherExpenseLog(
+          id: 3,
+          userId: 1,
+          date: '2026-06-05',
+          amountEur: 8.0,
+          type: EntryType.shared,
+          description: 'Peaje AP-7',
+        ),
+        user: user1,
+      ),
+    ],
+    totalPerUser: [
+      ExpenseTotal(user: user1, totalEur: 8.0),
+      ExpenseTotal(user: user2, totalEur: 0),
+    ],
+  ),
+  balance: ExpenseBalance(
+    settled: false,
+    amountEur: 8.5,
+    fromUser: user1,
+    toUser: user2,
   ),
   wash: WashSection(
     last: WashEntry(
@@ -497,6 +696,94 @@ MileageSummary mileageSample() => const MileageSummary(
   sharedKm: 120.5,
   sharedKmPerPerson: 60.25,
 );
+
+/// Usos de muestra: uno de Andy (id 1) y uno de Dennis (id 2), odómetro continuo.
+List<UsageLog> usageLogsSample() => const [
+  UsageLog(
+    id: 2,
+    userId: 2,
+    date: '2026-06-04',
+    startKm: 100,
+    endKm: 180,
+    totalKm: 80,
+    type: EntryType.shared,
+  ),
+  UsageLog(
+    id: 1,
+    userId: 1,
+    date: '2026-06-03',
+    startKm: 0,
+    endKm: 100,
+    totalKm: 100,
+    type: EntryType.individual,
+  ),
+];
+
+/// Cambios de uso de muestra para `user1` (id 1): 1 edición entrante pendiente
+/// (la propone Dennis → Andy aprueba), 1 eliminación saliente pendiente (la
+/// propone Andy → Dennis aprueba) y 1 alta aprobada en el historial.
+List<UsageChange> usageChangesSample() => const [
+  // Entrante: Dennis propone editar el uso 1; Andy (recipient) aprueba/rechaza.
+  UsageChange(
+    id: 50,
+    kind: UsageChangeKind.update,
+    requesterId: 2,
+    recipientId: 1,
+    status: UsageChangeStatus.pending,
+    usageId: 1,
+    original: UsageChangeFields(
+      userId: 1,
+      date: '2026-06-03',
+      startKm: 0,
+      endKm: 100,
+      type: EntryType.individual,
+    ),
+    proposed: UsageChangeFields(
+      userId: 1,
+      date: '2026-06-03',
+      startKm: 0,
+      endKm: 90,
+      type: EntryType.individual,
+    ),
+    requester: user2,
+    recipient: user1,
+  ),
+  // Saliente: Andy propone eliminar el uso 2; Andy (requester) puede cancelar.
+  UsageChange(
+    id: 51,
+    kind: UsageChangeKind.delete,
+    requesterId: 1,
+    recipientId: 2,
+    status: UsageChangeStatus.pending,
+    usageId: 2,
+    original: UsageChangeFields(
+      userId: 2,
+      date: '2026-06-04',
+      startKm: 100,
+      endKm: 180,
+      type: EntryType.shared,
+    ),
+    requester: user1,
+    recipient: user2,
+  ),
+  // Historial: alta ya aprobada.
+  UsageChange(
+    id: 52,
+    kind: UsageChangeKind.create,
+    requesterId: 1,
+    recipientId: 2,
+    status: UsageChangeStatus.approved,
+    proposed: UsageChangeFields(
+      userId: 1,
+      date: '2026-05-20',
+      startKm: 200,
+      endKm: 240,
+      type: EntryType.individual,
+    ),
+    requester: user1,
+    recipient: user2,
+  ),
+];
 
 /// Construye una prioridad de prueba para `priorityUser`.
 DailyPriority priorityFor(

@@ -9,9 +9,9 @@ import '../../data/models/models.dart';
 import 'expenses_controller.dart';
 import 'forms/forms.dart';
 
-/// Pantalla GASTOS (Fase F7): saldo de gasolina (reparto individual/compartido)
-/// y estado del lavado (último y a quién le toca). Punto de entrada a los 3
-/// formularios de registro. `GET /api/expenses`.
+/// Pantalla GASTOS (Fase F7): saldo combinado (gasolina + otros gastos, con
+/// reparto individual/compartido) y estado del lavado (último y a quién le toca).
+/// Punto de entrada a los 4 formularios de registro. `GET /api/expenses`.
 class ExpensesScreen extends ConsumerWidget {
   const ExpensesScreen({super.key});
 
@@ -45,6 +45,7 @@ class _ExpensesContent extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final fuel = summary.fuel;
+    final other = summary.other;
     final wash = summary.wash;
 
     return ListView(
@@ -53,14 +54,21 @@ class _ExpensesContent extends StatelessWidget {
       children: [
         const _ActionsRow(),
         const SizedBox(height: AppSpacing.xl),
+        _BalanceCard(balance: summary.balance),
+        const SizedBox(height: AppSpacing.xl),
         Text('GASOLINA', style: AppTypography.hudLabel()),
-        const SizedBox(height: AppSpacing.md),
-        _FuelBalanceCard(balance: fuel.balance),
         const SizedBox(height: AppSpacing.md),
         if (fuel.list.isEmpty)
           _EmptyNote(text: 'Aún no hay repostajes.')
         else
           for (final entry in fuel.list) _FuelHistoryTile(entry: entry),
+        const SizedBox(height: AppSpacing.xl),
+        Text('OTROS', style: AppTypography.hudLabel()),
+        const SizedBox(height: AppSpacing.md),
+        if (other.list.isEmpty)
+          _EmptyNote(text: 'Aún no hay otros gastos.')
+        else
+          for (final entry in other.list) _OtherHistoryTile(entry: entry),
         const SizedBox(height: AppSpacing.xl),
         Text('LAVADO', style: AppTypography.hudLabel()),
         const SizedBox(height: AppSpacing.md),
@@ -79,30 +87,52 @@ class _ActionsRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return Row(
+    return Column(
       children: [
-        Expanded(
-          child: _ActionTile(
-            icon: Icons.speed_outlined,
-            label: 'Uso',
-            onTap: () => _handle(context, openUsageForm, 'Uso registrado.'),
-          ),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionTile(
+                icon: Icons.speed_outlined,
+                label: 'Uso',
+                onTap: () => handleUsageForm(context),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _ActionTile(
+                icon: Icons.local_gas_station_outlined,
+                label: 'Gasolina',
+                onTap: () =>
+                    _handle(context, openFuelForm, 'Gasolina registrada.'),
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _ActionTile(
-            icon: Icons.local_gas_station_outlined,
-            label: 'Gasolina',
-            onTap: () => _handle(context, openFuelForm, 'Gasolina registrada.'),
-          ),
-        ),
-        const SizedBox(width: AppSpacing.md),
-        Expanded(
-          child: _ActionTile(
-            icon: Icons.local_car_wash_outlined,
-            label: 'Lavado',
-            onTap: () => _handle(context, openWashForm, 'Lavado registrado.'),
-          ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionTile(
+                icon: Icons.local_car_wash_outlined,
+                label: 'Lavado',
+                onTap: () =>
+                    _handle(context, openWashForm, 'Lavado registrado.'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _ActionTile(
+                icon: Icons.receipt_long_outlined,
+                label: 'Otro',
+                onTap: () => _handle(
+                  context,
+                  openOtherExpenseForm,
+                  'Gasto registrado.',
+                ),
+              ),
+            ),
+          ],
         ),
       ],
     );
@@ -152,10 +182,10 @@ class _ActionTile extends StatelessWidget {
   }
 }
 
-class _FuelBalanceCard extends StatelessWidget {
-  const _FuelBalanceCard({required this.balance});
+class _BalanceCard extends StatelessWidget {
+  const _BalanceCard({required this.balance});
 
-  final FuelBalance balance;
+  final ExpenseBalance balance;
 
   @override
   Widget build(BuildContext context) {
@@ -226,6 +256,56 @@ class _FuelHistoryTile extends StatelessWidget {
                 Text(user.name, style: theme.textTheme.bodyLarge),
                 Text(
                   _dateLabel(entry.log.date),
+                  style: theme.textTheme.bodySmall,
+                ),
+              ],
+            ),
+          ),
+          _TypeChip(type: entry.log.type),
+          const SizedBox(width: AppSpacing.md),
+          Text(
+            EsFormat.euro(entry.log.amountEur),
+            style: AppTypography.mono(size: 15, weight: FontWeight.w700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OtherHistoryTile extends StatelessWidget {
+  const _OtherHistoryTile({required this.entry});
+
+  final OtherExpenseEntry entry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final user = entry.user;
+    final color = colorFromHex(user.color) ?? personColor(user.profile);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  entry.log.description,
+                  style: theme.textTheme.bodyLarge,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${user.name} · ${_dateLabel(entry.log.date)}',
                   style: theme.textTheme.bodySmall,
                 ),
               ],
