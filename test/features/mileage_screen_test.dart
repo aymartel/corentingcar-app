@@ -36,10 +36,10 @@ void main() {
     expect(find.text('Andy'), findsWidgets);
     expect(find.text('Dennis'), findsWidgets);
     // Usados / límite con separador de miles (es-ES) sin decimales.
-    expect(find.text('6.240 / 8.000 km'), findsOneWidget);
-    expect(find.text('8.430 / 8.000 km'), findsOneWidget);
-    // Resumen anual (14.670 = 6.240 + 8.430).
-    expect(find.textContaining('16.000 km'), findsWidgets);
+    expect(find.text('6.240 / 7.500 km'), findsOneWidget);
+    expect(find.text('8.430 / 7.500 km'), findsOneWidget);
+    // Resumen anual (15.000 total).
+    expect(find.textContaining('15.000 km'), findsWidgets);
   });
 
   testWidgets('aviso de exceso visible con los km correctos', (tester) async {
@@ -49,7 +49,7 @@ void main() {
     );
 
     expect(find.text('CUPO SUPERADO'), findsOneWidget);
-    expect(find.textContaining('430 km de exceso'), findsOneWidget);
+    expect(find.textContaining('930 km de exceso'), findsOneWidget);
   });
 
   testWidgets('km compartidos como dato 50/50', (tester) async {

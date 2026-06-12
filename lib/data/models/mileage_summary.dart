@@ -21,7 +21,7 @@ class PersonMileage {
   final int usedKm;
   final int remainingKm;
 
-  /// Si la persona ha superado su cupo (8.000).
+  /// Si la persona ha superado su cupo anual.
   final bool exceeded;
 
   /// Km de exceso a pagar (0 si no se ha superado).
@@ -59,7 +59,7 @@ class MileageSummary {
   /// Una entrada por persona (Andy y Dennis).
   final List<PersonMileage> people;
 
-  /// Total anual (16.000) y cupo por persona (8.000).
+  /// Total anual (15.000) y cupo por persona (7.500).
   final int annualKmTotal;
   final int annualKmPerPerson;
 

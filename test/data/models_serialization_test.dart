@@ -10,8 +10,8 @@ void main() {
         'monthlyFeeEur': 355.0,
         'feeSplitPct': 50.0,
         'feePerPerson': 177.5,
-        'annualKmTotal': 16000,
-        'annualKmPerPerson': 8000,
+        'annualKmTotal': 15000,
+        'annualKmPerPerson': 7500,
         'kmWindow': 'natural',
         'sharedKmRounding': 1,
         'anchorDate': '2026-01-01',
@@ -23,7 +23,7 @@ void main() {
 
       expect(rules.monthlyFeeEur, 355.0);
       expect(rules.feePerPerson, 177.5);
-      expect(rules.annualKmPerPerson, 8000);
+      expect(rules.annualKmPerPerson, 7500);
       expect(rules.timezone, 'Europe/Madrid');
 
       final round = Rules.fromJson(rules.toJson());
@@ -85,8 +85,8 @@ void main() {
     test('parsea perUser (user anidado) y agregados', () {
       final summary = MileageSummary.fromJson({
         'kmWindow': 'natural',
-        'annualKmTotal': 16000,
-        'annualKmPerPerson': 8000,
+        'annualKmTotal': 15000,
+        'annualKmPerPerson': 7500,
         'sharedKm': 120,
         'sharedKmPerPerson': 60,
         'perUser': [
@@ -99,7 +99,7 @@ void main() {
             },
             'individualKm': 6240,
             'usedKm': 6240,
-            'remainingKm': 1760,
+            'remainingKm': 1260,
             'exceeded': false,
             'excessKm': 0,
           },
@@ -112,9 +112,9 @@ void main() {
             },
             'individualKm': 8430,
             'usedKm': 8430,
-            'remainingKm': 0,
+            'remainingKm': -930,
             'exceeded': true,
-            'excessKm': 430,
+            'excessKm': 930,
           },
         ],
       });
@@ -122,9 +122,9 @@ void main() {
       expect(summary.people, hasLength(2));
       expect(summary.people[0].user.name, 'Andy');
       expect(summary.people[1].exceeded, isTrue);
-      expect(summary.people[1].excessKm, 430);
+      expect(summary.people[1].excessKm, 930);
       expect(summary.sharedKmPerPerson, 60);
-      expect(MileageSummary.fromJson(summary.toJson()).annualKmTotal, 16000);
+      expect(MileageSummary.fromJson(summary.toJson()).annualKmTotal, 15000);
     });
   });
 

@@ -11,17 +11,30 @@ class ExpensesService {
   Future<ExpensesSummary> summary() async =>
       ExpensesSummary.fromJson(asMap(await _api.get('/expenses')));
 
-  /// `POST /api/fuel` `{ date, amountEur, type }`.
+  /// `POST /api/fuel` `{ date, amountEur, odometerKm }`. Siempre compartido: el backend reparte
+  /// el importe por los km de cada persona desde el último repostaje, según el odómetro del cuadro.
   Future<FuelLog> addFuel({
     required String date,
     required double amountEur,
-    required EntryType type,
+    required int odometerKm,
   }) async {
     final data = await _api.post(
       '/fuel',
-      body: {'date': date, 'amountEur': amountEur, 'type': type.toJson()},
+      body: {'date': date, 'amountEur': amountEur, 'odometerKm': odometerKm},
     );
     return FuelLog.fromJson(asMap(data));
+  }
+
+  /// `GET /api/fuel/preview?amountEur=&odometerKm=` — reparto por km sin persistir (vista en vivo).
+  Future<FuelPreview> fuelPreview({
+    required double amountEur,
+    required int odometerKm,
+  }) async {
+    final data = await _api.get(
+      '/fuel/preview',
+      query: {'amountEur': amountEur, 'odometerKm': odometerKm},
+    );
+    return FuelPreview.fromJson(asMap(data));
   }
 
   /// `POST /api/washes` `{ date, costEur? }`.

@@ -6,6 +6,7 @@ import '../../common/widgets/async_views.dart';
 import '../../common/widgets/glow_card.dart';
 import '../../core/format/es_format.dart';
 import '../../data/models/models.dart';
+import '../../data/providers.dart';
 import 'expenses_controller.dart';
 import 'forms/forms.dart';
 
@@ -228,45 +229,115 @@ class _BalanceCard extends StatelessWidget {
   }
 }
 
-class _FuelHistoryTile extends StatelessWidget {
+class _FuelHistoryTile extends ConsumerWidget {
   const _FuelHistoryTile({required this.entry});
 
   final FuelEntry entry;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final user = entry.user;
     final color = colorFromHex(user.color) ?? personColor(user.profile);
+    final split = entry.log.split;
+    final usersById =
+        ref.watch(usersByIdProvider).asData?.value ?? const <int, User>{};
 
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 10,
+                height: 10,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(user.name, style: theme.textTheme.bodyLarge),
+                    Text(
+                      entry.log.odometerKm != null
+                          ? '${_dateLabel(entry.log.date)} · ${EsFormat.km(entry.log.odometerKm!)} km'
+                          : _dateLabel(entry.log.date),
+                      style: theme.textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
+              // Filas antiguas (sin reparto por km) conservan el chip individual/compartido.
+              if (split == null) _TypeChip(type: entry.log.type),
+              const SizedBox(width: AppSpacing.md),
+              Text(
+                EsFormat.euro(entry.log.amountEur),
+                style: AppTypography.mono(size: 15, weight: FontWeight.w700),
+              ),
+            ],
+          ),
+          if (split != null)
+            Padding(
+              padding: const EdgeInsets.only(left: 22, top: AppSpacing.xs),
+              child: _FuelSplitLines(split: split, usersById: usersById),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Desglose por persona del reparto por km de un repostaje (en el historial).
+class _FuelSplitLines extends StatelessWidget {
+  const _FuelSplitLines({required this.split, required this.usersById});
+
+  final FuelSplit split;
+  final Map<int, User> usersById;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        for (final p in split.perUser) _line(theme, p),
+        if (split.isFallback)
+          Text(
+            'Repartido 50/50 (sin km en el periodo)',
+            style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+          ),
+      ],
+    );
+  }
+
+  Widget _line(ThemeData theme, FuelSplitPerUser p) {
+    final user = usersById[p.userId];
+    final name = user?.name ?? 'Usuario ${p.userId}';
+    final color = user == null
+        ? AppColors.textMuted
+        : (colorFromHex(user.color) ?? personColor(user.profile));
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 2),
       child: Row(
         children: [
           Container(
-            width: 10,
-            height: 10,
+            width: 6,
+            height: 6,
             decoration: BoxDecoration(color: color, shape: BoxShape.circle),
           ),
-          const SizedBox(width: AppSpacing.md),
+          const SizedBox(width: AppSpacing.sm),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(user.name, style: theme.textTheme.bodyLarge),
-                Text(
-                  _dateLabel(entry.log.date),
-                  style: theme.textTheme.bodySmall,
-                ),
-              ],
+            child: Text(
+              '$name · ${EsFormat.decimal(p.km)} km',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
             ),
           ),
-          _TypeChip(type: entry.log.type),
-          const SizedBox(width: AppSpacing.md),
-          Text(
-            EsFormat.euro(entry.log.amountEur),
-            style: AppTypography.mono(size: 15, weight: FontWeight.w700),
-          ),
+          Text(EsFormat.euro(p.shareEur), style: AppTypography.mono(size: 12)),
         ],
       ),
     );

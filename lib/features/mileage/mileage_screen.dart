@@ -10,7 +10,7 @@ import '../../data/models/models.dart';
 import '../usage_history/usage_history_screen.dart';
 import 'mileage_controller.dart';
 
-/// Pantalla KILÓMETROS (Fase F6): consumo del año por persona (límite 8.000),
+/// Pantalla KILÓMETROS (Fase F6): consumo del año por persona (cupo por persona),
 /// km compartidos (50/50) y aviso de exceso. `GET /api/mileage`.
 class MileageScreen extends ConsumerWidget {
   const MileageScreen({super.key});
@@ -64,7 +64,7 @@ class _MileageContent extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpacing.lg),
       children: [
         if (exceeded.isNotEmpty) ...[
-          _ExcessBanner(people: exceeded),
+          _ExcessBanner(people: exceeded, limit: summary.annualKmPerPerson),
           const SizedBox(height: AppSpacing.xl),
         ],
         Text('POR PERSONA', style: AppTypography.hudLabel()),
@@ -232,9 +232,12 @@ class _Stat extends StatelessWidget {
 }
 
 class _ExcessBanner extends StatelessWidget {
-  const _ExcessBanner({required this.people});
+  const _ExcessBanner({required this.people, required this.limit});
 
   final List<PersonMileage> people;
+
+  /// Cupo anual por persona (de `rules`); se muestra en el aviso.
+  final int limit;
 
   @override
   Widget build(BuildContext context) {
@@ -265,7 +268,7 @@ class _ExcessBanner extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.only(top: AppSpacing.xs),
               child: Text(
-                '${p.user.name} ha superado los ${EsFormat.km(8000)} km: '
+                '${p.user.name} ha superado los ${EsFormat.km(limit)} km: '
                 '${EsFormat.km(p.excessKm)} km de exceso (se pagan).',
                 style: theme.textTheme.bodyMedium,
               ),

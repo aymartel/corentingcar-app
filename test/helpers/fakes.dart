@@ -410,6 +410,7 @@ class FakeExpensesService extends ExpensesService {
   final ApiException? summaryError;
 
   int fuelCalls = 0;
+  int previewCalls = 0;
   int washCalls = 0;
   int otherCalls = 0;
 
@@ -424,7 +425,7 @@ class FakeExpensesService extends ExpensesService {
   Future<FuelLog> addFuel({
     required String date,
     required double amountEur,
-    required EntryType type,
+    required int odometerKm,
   }) async {
     await Future<void>.delayed(Duration.zero);
     fuelCalls++;
@@ -433,7 +434,37 @@ class FakeExpensesService extends ExpensesService {
       userId: 1,
       date: date,
       amountEur: amountEur,
-      type: type,
+      type: EntryType.shared,
+      odometerKm: odometerKm,
+    );
+  }
+
+  @override
+  Future<FuelPreview> fuelPreview({
+    required double amountEur,
+    required int odometerKm,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    previewCalls++;
+    // Reparto fijo 75/25 (Andy/Dennis) para verificar la vista en vivo.
+    return FuelPreview(
+      windowStartKm: null,
+      windowEndKm: odometerKm,
+      fallback: false,
+      perUser: [
+        FuelPreviewPerUser(
+          user: const User(id: 1, name: 'Andy', profile: 'user1', color: '#9CC93B'),
+          km: 150,
+          shareEur: amountEur * 0.75,
+        ),
+        FuelPreviewPerUser(
+          user: const User(id: 2, name: 'Dennis', profile: 'user2', color: '#FF8A3D'),
+          km: 50,
+          shareEur: amountEur * 0.25,
+        ),
+      ],
+      payerShareEur: amountEur * 0.75,
+      amountEur: amountEur,
     );
   }
 
@@ -485,8 +516,8 @@ Rules rulesSample() => const Rules(
   monthlyFeeEur: 355.0,
   feeSplitPct: 50.0,
   feePerPerson: 177.5,
-  annualKmTotal: 16000,
-  annualKmPerPerson: 8000,
+  annualKmTotal: 15000,
+  annualKmPerPerson: 7500,
   kmWindow: 'natural',
   sharedKmRounding: 1,
   anchorDate: '2026-01-01',
@@ -678,7 +709,7 @@ MileageSummary mileageSample() => const MileageSummary(
       user: user1,
       individualKm: 6240,
       usedKm: 6240,
-      remainingKm: 1760,
+      remainingKm: 1260,
       exceeded: false,
       excessKm: 0,
     ),
@@ -686,13 +717,13 @@ MileageSummary mileageSample() => const MileageSummary(
       user: user2,
       individualKm: 8430,
       usedKm: 8430,
-      remainingKm: 0,
+      remainingKm: -930,
       exceeded: true,
-      excessKm: 430,
+      excessKm: 930,
     ),
   ],
-  annualKmTotal: 16000,
-  annualKmPerPerson: 8000,
+  annualKmTotal: 15000,
+  annualKmPerPerson: 7500,
   sharedKm: 120.5,
   sharedKmPerPerson: 60.25,
 );

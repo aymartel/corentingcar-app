@@ -1,4 +1,4 @@
-"""Regenera el icono de la app con fondo BLANCO, ondas verdes y sombras grises.
+"""Regenera el icono de la app con fondo VERDE CLARO, ondas verdes y sombras grises.
 Fuente del coche: Jeep.png (recorte limpio, transparente). No requiere numpy."""
 import math
 import random
@@ -6,6 +6,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageChops
 
 S = 1024
 GREEN = (156, 201, 59)        # #9CC93B (verde de marca)
+BG = (205, 229, 138)          # #CDE58A (fondo verde claro; tinte claro del verde de marca)
 GRAY = (88, 92, 80)           # gris cálido para sombras
 
 
@@ -59,21 +60,21 @@ def car_and_shadow(target_w_frac, center_y_frac, shadow_alpha=185):
 
 def build():
     # --- Icono principal (iOS + fallback Android): coche grande ---
-    out = Image.new("RGBA", (S, S), (255, 255, 255, 255))   # fondo blanco
+    out = Image.new("RGBA", (S, S), (*BG, 255))   # fondo verde claro
     out.alpha_composite(wavy_lines(alpha=105, count=13, width=3, blur=0.9))
     out.alpha_composite(wavy_lines(alpha=52, count=7, width=9, blur=6.0))
     out.alpha_composite(radial_glow(S * 0.5, S * 0.53, 360, 285, 78, 120))
-    car_layer, shadow = car_and_shadow(0.80, 0.50)
+    car_layer, shadow = car_and_shadow(0.90, 0.50)
     out.alpha_composite(shadow)
     out.alpha_composite(car_layer)
     out.convert("RGB").save("icon.png")
     print("icon.png OK")
 
-    # --- Foreground adaptativo (Android): coche más pequeño dentro de la zona
-    # segura (el sistema recorta el icono en círculo/squircle). Fondo transparente.
+    # --- Foreground adaptativo (Android): coche dentro de la zona segura (el
+    # sistema recorta el icono en círculo/squircle). Fondo transparente. ---
     fg = Image.new("RGBA", (S, S), (0, 0, 0, 0))
     fg.alpha_composite(radial_glow(S * 0.5, S * 0.52, 235, 195, 75, 95))
-    fg_car, fg_shadow = car_and_shadow(0.58, 0.50)
+    fg_car, fg_shadow = car_and_shadow(0.66, 0.50)
     fg.alpha_composite(fg_shadow)
     fg.alpha_composite(fg_car)
     fg.save("icon_foreground.png")

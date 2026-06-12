@@ -1,4 +1,5 @@
 import 'package:coretingcar/common/theme/theme.dart';
+import 'package:coretingcar/core/format/es_format.dart';
 import 'package:coretingcar/data/models/models.dart';
 import 'package:coretingcar/data/providers.dart';
 import 'package:coretingcar/features/expenses/forms/forms.dart';
@@ -45,9 +46,29 @@ Future<void> _pumpLauncher(
 void main() {
   setUpAll(() => initializeDateFormatting('es_ES'));
 
+  // El formulario de gasolina prerellena el odómetro con el último `endKm` de usos.
+  FakeUsageService fuelUsage() => FakeUsageService(
+    usageList: const [
+      UsageLog(
+        id: 1,
+        userId: 1,
+        date: '2026-06-04',
+        startKm: 0,
+        endKm: 200,
+        totalKm: 200,
+        type: EntryType.individual,
+      ),
+    ],
+  );
+
   testWidgets('gasolina: importe inválido no envía', (tester) async {
     final expenses = FakeExpensesService();
-    await _pumpLauncher(tester, opener: openFuelForm, expenses: expenses);
+    await _pumpLauncher(
+      tester,
+      opener: openFuelForm,
+      expenses: expenses,
+      usage: fuelUsage(),
+    );
 
     // Sin importe → validación, no se llama al servicio.
     await tester.tap(find.text('GUARDAR'));
@@ -58,14 +79,47 @@ void main() {
 
   testWidgets('gasolina: importe válido envía y cierra', (tester) async {
     final expenses = FakeExpensesService();
-    await _pumpLauncher(tester, opener: openFuelForm, expenses: expenses);
+    await _pumpLauncher(
+      tester,
+      opener: openFuelForm,
+      expenses: expenses,
+      usage: fuelUsage(),
+    );
 
-    await tester.enterText(find.byType(TextField), '20');
+    // Importe en el primer campo; el odómetro se prerellena con 200.
+    await tester.enterText(find.byType(TextField).first, '20');
     await tester.tap(find.text('GUARDAR'));
     await tester.pumpAndSettle();
 
     expect(expenses.fuelCalls, 1);
     expect(find.text('GUARDAR'), findsNothing); // el sheet se cerró
+  });
+
+  testWidgets('gasolina: al teclear el importe muestra el reparto por km', (
+    tester,
+  ) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(
+      tester,
+      opener: openFuelForm,
+      expenses: expenses,
+      usage: fuelUsage(),
+    );
+
+    // Ya no hay selector individual/compartido (siempre compartido por km).
+    expect(find.text('Compartido'), findsNothing);
+
+    await tester.enterText(find.byType(TextField).first, '20'); // importe
+    await tester.pump(const Duration(milliseconds: 400)); // pasa el debounce
+    await tester.pump(); // procesa la respuesta del preview
+
+    expect(expenses.previewCalls, greaterThanOrEqualTo(1));
+    expect(find.text('REPARTO POR KM'), findsOneWidget);
+    expect(find.text('Andy'), findsOneWidget);
+    expect(find.text('Dennis'), findsOneWidget);
+    // 20 € → Andy 15,00 €, Dennis 5,00 €.
+    expect(find.text(EsFormat.euro(15)), findsOneWidget);
+    expect(find.text(EsFormat.euro(5)), findsOneWidget);
   });
 
   testWidgets('otro gasto: descripción vacía no envía', (tester) async {

@@ -45,8 +45,8 @@ void main() {
     // Reparto económico y km desde GET /api/rules.
     expect(find.textContaining('355,00'), findsOneWidget);
     expect(find.textContaining('177,50'), findsOneWidget);
-    expect(find.textContaining('16.000 km'), findsOneWidget);
-    expect(find.textContaining('8.000 km'), findsOneWidget);
+    expect(find.textContaining('15.000 km'), findsOneWidget);
+    expect(find.textContaining('7.500 km'), findsOneWidget);
     // Reglas fijas.
     expect(find.textContaining('quien consume'), findsOneWidget);
     expect(find.text('Alterna: uno cada uno'), findsOneWidget);
