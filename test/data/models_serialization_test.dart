@@ -89,6 +89,11 @@ void main() {
         'annualKmPerPerson': 7500,
         'sharedKm': 120,
         'sharedKmPerPerson': 60,
+        'kmStartDate': '2026-06-10',
+        'daysSinceStart': 12,
+        'monthlyKmPerPerson': 625,
+        'dailyKmPerPerson': 20.8,
+        'recommendedToDate': 250,
         'perUser': [
           {
             'user': {
@@ -102,6 +107,7 @@ void main() {
             'remainingKm': 1260,
             'exceeded': false,
             'excessKm': 0,
+            'usedSinceStart': 400,
           },
           {
             'user': {
@@ -121,9 +127,12 @@ void main() {
 
       expect(summary.people, hasLength(2));
       expect(summary.people[0].user.name, 'Andy');
+      expect(summary.people[0].usedSinceStart, 400);
       expect(summary.people[1].exceeded, isTrue);
       expect(summary.people[1].excessKm, 930);
       expect(summary.sharedKmPerPerson, 60);
+      expect(summary.monthlyKmPerPerson, 625);
+      expect(summary.recommendedToDate, 250);
       expect(MileageSummary.fromJson(summary.toJson()).annualKmTotal, 15000);
     });
   });

@@ -16,6 +16,7 @@ Future<void> _pumpLauncher(
   required Future<Object?> Function(BuildContext) opener,
   FakeExpensesService? expenses,
   FakeUsageService? usage,
+  FakeAuthService? auth,
 }) async {
   await tester.pumpWidget(
     ProviderScope(
@@ -23,6 +24,8 @@ Future<void> _pumpLauncher(
         if (expenses != null)
           expensesServiceProvider.overrideWithValue(expenses),
         if (usage != null) usageServiceProvider.overrideWithValue(usage),
+        // allUsersProvider (selector de pagador en el pago) usa authServiceProvider.
+        if (auth != null) authServiceProvider.overrideWithValue(auth),
       ],
       child: MaterialApp(
         theme: AppTheme.dark(),
@@ -155,6 +158,38 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(expenses.otherCalls, 1);
+    expect(find.text('GUARDAR'), findsNothing); // el sheet se cerró
+  });
+
+  testWidgets('pago: registra un pago de Dennis a Andy y ajusta from→to', (
+    tester,
+  ) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(
+      tester,
+      opener: openSettlementForm,
+      expenses: expenses,
+      auth: FakeAuthService(),
+    );
+
+    // Selector de pagador; por defecto paga el primero (Andy) → recibe Dennis.
+    expect(find.text('QUIÉN PAGA'), findsOneWidget);
+    expect(find.text('Recibe Dennis'), findsOneWidget);
+
+    // Cambia el pagador a Dennis → ahora recibe Andy.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dennis'));
+    await tester.pump();
+    expect(find.text('Recibe Andy'), findsOneWidget);
+
+    // Importe y guardar.
+    await tester.enterText(find.byType(TextField).first, '15');
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(expenses.settlementCalls, 1);
+    expect(expenses.lastSettlementFrom, 2); // Dennis
+    expect(expenses.lastSettlementTo, 1); // Andy
+    expect(expenses.lastSettlementAmount, 15);
     expect(find.text('GUARDAR'), findsNothing); // el sheet se cerró
   });
 

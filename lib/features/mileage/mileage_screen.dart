@@ -70,7 +70,11 @@ class _MileageContent extends StatelessWidget {
         Text('POR PERSONA', style: AppTypography.hudLabel()),
         const SizedBox(height: AppSpacing.md),
         for (final person in summary.people) ...[
-          _PersonMileageCard(person: person, limit: summary.annualKmPerPerson),
+          _PersonMileageCard(
+            person: person,
+            limit: summary.annualKmPerPerson,
+            summary: summary,
+          ),
           const SizedBox(height: AppSpacing.md),
         ],
         const SizedBox(height: AppSpacing.md),
@@ -121,10 +125,15 @@ class _ProgressBar extends StatelessWidget {
 }
 
 class _PersonMileageCard extends StatelessWidget {
-  const _PersonMileageCard({required this.person, required this.limit});
+  const _PersonMileageCard({
+    required this.person,
+    required this.limit,
+    required this.summary,
+  });
 
   final PersonMileage person;
   final int limit;
+  final MileageSummary summary;
 
   @override
   Widget build(BuildContext context) {
@@ -185,6 +194,10 @@ class _PersonMileageCard extends StatelessWidget {
               ),
             ],
           ),
+          if (summary.kmStartDate != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            _PaceSection(person: person, summary: summary, color: color),
+          ],
           if (person.exceeded) ...[
             const SizedBox(height: AppSpacing.md),
             Row(
@@ -206,6 +219,127 @@ class _PersonMileageCard extends StatelessWidget {
               ],
             ),
           ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Ritmo ACUMULADO desde el primer uso: barra con lo aconsejado hasta hoy (gris,
+/// el cupo arrastrado) y lo realmente usado (color de la persona). Si el color
+/// supera al gris vas por encima (gastas tu colchón); si no, ahorras km.
+class _PaceSection extends StatelessWidget {
+  const _PaceSection({
+    required this.person,
+    required this.summary,
+    required this.color,
+  });
+
+  final PersonMileage person;
+  final MileageSummary summary;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final used = person.usedSinceStart;
+    final recommended = summary.recommendedToDate;
+    final diff = used - recommended;
+    final ahead = diff > 0; // por encima del ritmo aconsejado (consume colchón)
+    final statusColor = ahead ? AppColors.warning : AppColors.success;
+    final statusText = ahead
+        ? '${EsFormat.km(diff)} km por encima'
+        : '${EsFormat.km(-diff)} km por debajo';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('RITMO ACUMULADO', style: AppTypography.hudLabel()),
+            const Spacer(),
+            Text(
+              statusText,
+              style: AppTypography.hudLabel(color: statusColor),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _PaceBar(used: used, recommended: recommended, color: color),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Usado ${EsFormat.km(used)} · aconsejado ${EsFormat.km(recommended)} km '
+          '(${summary.daysSinceStart} días desde el inicio)',
+          style: theme.textTheme.bodySmall,
+        ),
+        Text(
+          'Aconsejado · mes ${EsFormat.km(summary.monthlyKmPerPerson)} · '
+          'año ${EsFormat.km(summary.annualKmPerPerson)} km · '
+          '${EsFormat.decimal(summary.dailyKmPerPerson)}/día',
+          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+        ),
+      ],
+    );
+  }
+}
+
+/// Barra de ritmo acumulado: escala = el mayor entre usado y aconsejado; gris =
+/// aconsejado hasta hoy (detrás); color del usuario = realmente usado (delante).
+/// Si el color supera al gris, vas por encima del ritmo.
+class _PaceBar extends StatelessWidget {
+  const _PaceBar({
+    required this.used,
+    required this.recommended,
+    required this.color,
+  });
+
+  final double used;
+  final double recommended;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final maxVal = used > recommended ? used : recommended;
+    final scale = maxVal <= 0 ? 1.0 : maxVal;
+    final usedRatio = (used / scale).clamp(0.0, 1.0);
+    final recRatio = (recommended / scale).clamp(0.0, 1.0);
+    final overPace = used > recommended;
+    final fill = overPace ? AppColors.warning : color;
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: AppRadius.rsm,
+        border: Border.all(color: AppColors.outline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      height: 14,
+      child: Stack(
+        children: [
+          // Aconsejado a hoy (gris, detrás).
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: recRatio,
+              child: ColoredBox(
+                color: AppColors.textMuted.withValues(alpha: 0.45),
+              ),
+            ),
+          ),
+          // Realmente usado (color de la persona, delante).
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: usedRatio,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [fill.withValues(alpha: 0.6), fill],
+                  ),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

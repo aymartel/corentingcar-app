@@ -63,6 +63,26 @@ void main() {
     expect(find.text('Dennis'), findsWidgets);
   });
 
+  testWidgets('sección PAGOS muestra el pago y permite eliminarlo', (
+    tester,
+  ) async {
+    final expenses = FakeExpensesService(summaryResult: expensesSample());
+    await _pumpExpenses(tester, expenses);
+
+    // Pago de muestra: Andy → Dennis, 10 € (Bizum).
+    expect(find.text('PAGOS'), findsOneWidget);
+    expect(find.text('Andy → Dennis'), findsOneWidget);
+
+    // Eliminar: icono → diálogo de confirmación → ELIMINAR.
+    await tester.tap(find.byTooltip('Eliminar pago'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('ELIMINAR'));
+    await tester.pumpAndSettle();
+
+    expect(expenses.deleteSettlementCalls, 1);
+    expect(expenses.lastDeletedSettlementId, 7);
+  });
+
   testWidgets('error del backend muestra mensaje y reintento', (tester) async {
     await _pumpExpenses(
       tester,

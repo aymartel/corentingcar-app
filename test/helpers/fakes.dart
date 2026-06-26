@@ -413,6 +413,12 @@ class FakeExpensesService extends ExpensesService {
   int previewCalls = 0;
   int washCalls = 0;
   int otherCalls = 0;
+  int settlementCalls = 0;
+  int deleteSettlementCalls = 0;
+  int? lastSettlementFrom;
+  int? lastSettlementTo;
+  double? lastSettlementAmount;
+  int? lastDeletedSettlementId;
 
   @override
   Future<ExpensesSummary> summary() async {
@@ -492,6 +498,36 @@ class FakeExpensesService extends ExpensesService {
       type: type,
       description: description,
     );
+  }
+
+  @override
+  Future<Settlement> addSettlement({
+    required int fromUserId,
+    required int toUserId,
+    required String date,
+    required double amountEur,
+    String? note,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    settlementCalls++;
+    lastSettlementFrom = fromUserId;
+    lastSettlementTo = toUserId;
+    lastSettlementAmount = amountEur;
+    return Settlement(
+      id: 1,
+      fromUserId: fromUserId,
+      toUserId: toUserId,
+      date: date,
+      amountEur: amountEur,
+      note: note,
+    );
+  }
+
+  @override
+  Future<void> deleteSettlement(int id) async {
+    await Future<void>.delayed(Duration.zero);
+    deleteSettlementCalls++;
+    lastDeletedSettlementId = id;
   }
 }
 
@@ -681,6 +717,22 @@ ExpensesSummary expensesSample() => const ExpensesSummary(
       ExpenseTotal(user: user2, totalEur: 0),
     ],
   ),
+  settlements: SettlementSection(
+    list: [
+      SettlementEntry(
+        log: Settlement(
+          id: 7,
+          fromUserId: 1,
+          toUserId: 2,
+          date: '2026-06-07',
+          amountEur: 10.0,
+          note: 'Bizum',
+        ),
+        fromUser: user1,
+        toUser: user2,
+      ),
+    ],
+  ),
   balance: ExpenseBalance(
     settled: false,
     amountEur: 8.5,
@@ -712,6 +764,7 @@ MileageSummary mileageSample() => const MileageSummary(
       remainingKm: 1260,
       exceeded: false,
       excessKm: 0,
+      usedSinceStart: 400, // por encima del ritmo (250 aconsejados acumulados)
     ),
     PersonMileage(
       user: user2,
@@ -720,12 +773,18 @@ MileageSummary mileageSample() => const MileageSummary(
       remainingKm: -930,
       exceeded: true,
       excessKm: 930,
+      usedSinceStart: 180, // por debajo del ritmo
     ),
   ],
   annualKmTotal: 15000,
   annualKmPerPerson: 7500,
   sharedKm: 120.5,
   sharedKmPerPerson: 60.25,
+  kmStartDate: '2026-06-10',
+  daysSinceStart: 12,
+  monthlyKmPerPerson: 625,
+  dailyKmPerPerson: 20.8,
+  recommendedToDate: 250,
 );
 
 /// Usos de muestra: uno de Andy (id 1) y uno de Dennis (id 2), odómetro continuo.

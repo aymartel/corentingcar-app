@@ -64,4 +64,30 @@ class ExpensesService {
     );
     return OtherExpenseLog.fromJson(asMap(data));
   }
+
+  /// `POST /api/settlements` — pago directo `fromUserId`→`toUserId` (saldar cuentas).
+  Future<Settlement> addSettlement({
+    required int fromUserId,
+    required int toUserId,
+    required String date,
+    required double amountEur,
+    String? note,
+  }) async {
+    final data = await _api.post(
+      '/settlements',
+      body: {
+        'fromUserId': fromUserId,
+        'toUserId': toUserId,
+        'date': date,
+        'amountEur': amountEur,
+        if (note != null && note.trim().isNotEmpty) 'note': note.trim(),
+      },
+    );
+    return Settlement.fromJson(asMap(data));
+  }
+
+  /// `DELETE /api/settlements/:id` — elimina un pago directo (deshacer).
+  Future<void> deleteSettlement(int id) async {
+    await _api.delete('/settlements/$id');
+  }
 }

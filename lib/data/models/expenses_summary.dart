@@ -1,6 +1,7 @@
 import 'fuel_log.dart';
 import 'json_utils.dart';
 import 'other_expense_log.dart';
+import 'settlement.dart';
 import 'user.dart';
 import 'wash_log.dart';
 
@@ -47,6 +48,31 @@ class WashEntry {
   );
 
   JsonMap toJson() => {...log.toJson(), 'user': user.toJson()};
+}
+
+/// Pago directo con quién pagó y quién recibió (entrada del historial de pagos).
+class SettlementEntry {
+  const SettlementEntry({
+    required this.log,
+    required this.fromUser,
+    required this.toUser,
+  });
+
+  final Settlement log;
+  final User fromUser;
+  final User toUser;
+
+  factory SettlementEntry.fromJson(JsonMap json) => SettlementEntry(
+    log: Settlement.fromJson(json),
+    fromUser: User.fromJson(asMap(json['fromUser'])),
+    toUser: User.fromJson(asMap(json['toUser'])),
+  );
+
+  JsonMap toJson() => {
+    ...log.toJson(),
+    'fromUser': fromUser.toJson(),
+    'toUser': toUser.toJson(),
+  };
 }
 
 /// Total de gasto pagado por una persona (gasolina u otros).
@@ -152,6 +178,22 @@ class OtherSection {
   };
 }
 
+/// Sección de pagos directos (saldar cuentas) entre los 2 usuarios.
+class SettlementSection {
+  const SettlementSection({required this.list});
+
+  final List<SettlementEntry> list;
+
+  /// Sección vacía (backend antiguo sin la clave `settlements`).
+  factory SettlementSection.empty() => const SettlementSection(list: []);
+
+  factory SettlementSection.fromJson(JsonMap json) => SettlementSection(
+    list: asMapList(json['list']).map(SettlementEntry.fromJson).toList(),
+  );
+
+  JsonMap toJson() => {'list': list.map((e) => e.toJson()).toList()};
+}
+
 /// Sección de lavado: último, a quién le toca el próximo (alternancia) e historial.
 class WashSection {
   const WashSection({
@@ -184,12 +226,14 @@ class ExpensesSummary {
   const ExpensesSummary({
     required this.fuel,
     required this.other,
+    required this.settlements,
     required this.balance,
     required this.wash,
   });
 
   final FuelSection fuel;
   final OtherSection other;
+  final SettlementSection settlements;
   final ExpenseBalance balance;
   final WashSection wash;
 
@@ -200,6 +244,9 @@ class ExpensesSummary {
       other: json['other'] == null
           ? OtherSection.empty()
           : OtherSection.fromJson(asMap(json['other'])),
+      settlements: json['settlements'] == null
+          ? SettlementSection.empty()
+          : SettlementSection.fromJson(asMap(json['settlements'])),
       balance: json['balance'] == null
           ? fuel.balance
           : ExpenseBalance.fromJson(asMap(json['balance'])),
@@ -210,6 +257,7 @@ class ExpensesSummary {
   JsonMap toJson() => {
     'fuel': fuel.toJson(),
     'other': other.toJson(),
+    'settlements': settlements.toJson(),
     'balance': balance.toJson(),
     'wash': wash.toJson(),
   };

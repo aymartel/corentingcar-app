@@ -47,6 +47,7 @@ class _ExpensesContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final fuel = summary.fuel;
     final other = summary.other;
+    final settlements = summary.settlements;
     final wash = summary.wash;
 
     return ListView(
@@ -70,6 +71,14 @@ class _ExpensesContent extends StatelessWidget {
           _EmptyNote(text: 'Aún no hay otros gastos.')
         else
           for (final entry in other.list) _OtherHistoryTile(entry: entry),
+        const SizedBox(height: AppSpacing.xl),
+        Text('PAGOS', style: AppTypography.hudLabel()),
+        const SizedBox(height: AppSpacing.md),
+        if (settlements.list.isEmpty)
+          _EmptyNote(text: 'Aún no hay pagos entre vosotros.')
+        else
+          for (final entry in settlements.list)
+            _SettlementHistoryTile(entry: entry),
         const SizedBox(height: AppSpacing.xl),
         Text('LAVADO', style: AppTypography.hudLabel()),
         const SizedBox(height: AppSpacing.md),
@@ -131,6 +140,19 @@ class _ActionsRow extends ConsumerWidget {
                   openOtherExpenseForm,
                   'Gasto registrado.',
                 ),
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.md),
+        Row(
+          children: [
+            Expanded(
+              child: _ActionTile(
+                icon: Icons.swap_horiz,
+                label: 'Pago',
+                onTap: () =>
+                    _handle(context, openSettlementForm, 'Pago registrado.'),
               ),
             ),
           ],
@@ -223,9 +245,34 @@ class _BalanceCard extends StatelessWidget {
             EsFormat.euro(balance.amountEur),
             style: AppTypography.odometer(size: 24, color: AppColors.warning),
           ),
+          if (balance.fromUser != null) ...[
+            const SizedBox(height: AppSpacing.md),
+            Align(
+              alignment: Alignment.centerRight,
+              child: OutlinedButton.icon(
+                onPressed: () => _settle(context),
+                icon: const Icon(Icons.swap_horiz, size: 18),
+                label: const Text('SALDAR'),
+              ),
+            ),
+          ],
         ],
       ),
     );
+  }
+
+  /// Abre el formulario de pago prerrellenado con el deudor y el importe de la deuda.
+  Future<void> _settle(BuildContext context) async {
+    final ok = await openSettlementForm(
+      context,
+      fromUserId: balance.fromUser?.id,
+      amount: balance.amountEur,
+    );
+    if (ok == true && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Pago registrado.')));
+    }
   }
 }
 
@@ -391,6 +438,108 @@ class _OtherHistoryTile extends StatelessWidget {
         ],
       ),
     );
+  }
+}
+
+class _SettlementHistoryTile extends ConsumerWidget {
+  const _SettlementHistoryTile({required this.entry});
+
+  final SettlementEntry entry;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final fromColor =
+        colorFromHex(entry.fromUser.color) ?? personColor(entry.fromUser.profile);
+    final note = entry.log.note;
+    final subtitle = note == null || note.isEmpty
+        ? _dateLabel(entry.log.date)
+        : '${_dateLabel(entry.log.date)} · $note';
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: Row(
+        children: [
+          Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(color: fromColor, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: AppSpacing.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${entry.fromUser.name} → ${entry.toUser.name}',
+                  style: theme.textTheme.bodyLarge,
+                ),
+                Text(subtitle, style: theme.textTheme.bodySmall),
+              ],
+            ),
+          ),
+          Text(
+            EsFormat.euro(entry.log.amountEur),
+            style: AppTypography.mono(
+              size: 15,
+              weight: FontWeight.w700,
+            ).copyWith(color: AppColors.info),
+          ),
+          IconButton(
+            visualDensity: VisualDensity.compact,
+            icon: const Icon(
+              Icons.delete_outline,
+              size: 18,
+              color: AppColors.textMuted,
+            ),
+            tooltip: 'Eliminar pago',
+            onPressed: () => _confirmDelete(context, ref),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surfaceHigh,
+        title: const Text('Eliminar pago'),
+        content: Text(
+          '¿Eliminar el pago de ${entry.fromUser.name} a ${entry.toUser.name} '
+          'de ${EsFormat.euro(entry.log.amountEur)}? El saldo se recalculará.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(expensesServiceProvider).deleteSettlement(entry.log.id);
+      ref.invalidate(expensesControllerProvider);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(const SnackBar(content: Text('Pago eliminado.')));
+      }
+    } catch (_) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(
+            const SnackBar(content: Text('No se pudo eliminar el pago.')),
+          );
+      }
+    }
   }
 }
 

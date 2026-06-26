@@ -14,6 +14,7 @@ export 'mileage_summary.dart';
 export 'other_expense_log.dart';
 export 'request_status.dart';
 export 'rules.dart';
+export 'settlement.dart';
 export 'usage_change.dart';
 export 'usage_log.dart';
 export 'use_request.dart';

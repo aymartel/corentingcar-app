@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../data/models/models.dart';
 import 'fuel_form.dart';
 import 'other_expense_form.dart';
+import 'settlement_form.dart';
 import 'usage_form.dart';
 import 'wash_form.dart';
 
 export 'fuel_form.dart';
 export 'other_expense_form.dart';
+export 'settlement_form.dart';
 export 'usage_form.dart';
 export 'wash_form.dart';
 
@@ -32,6 +34,17 @@ Future<bool?> openWashForm(BuildContext context) =>
 /// Abre el formulario de **registrar otro gasto**. Devuelve `true` si se guardó.
 Future<bool?> openOtherExpenseForm(BuildContext context) =>
     _openForm<bool>(context, const OtherExpenseForm());
+
+/// Abre el formulario de **registrar pago** (saldar cuentas). Con [fromUserId] /
+/// [amount] se prerrellena para saldar la deuda actual. Devuelve `true` si se guardó.
+Future<bool?> openSettlementForm(
+  BuildContext context, {
+  int? fromUserId,
+  double? amount,
+}) => _openForm<bool>(
+  context,
+  SettlementForm(initialFromUserId: fromUserId, initialAmount: amount),
+);
 
 Future<T?> _openForm<T>(BuildContext context, Widget form) =>
     showModalBottomSheet<T>(

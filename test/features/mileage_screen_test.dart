@@ -40,6 +40,12 @@ void main() {
     expect(find.text('8.430 / 7.500 km'), findsOneWidget);
     // Resumen anual (15.000 total).
     expect(find.textContaining('15.000 km'), findsWidgets);
+    // Ritmo acumulado: Andy por encima (400 usados vs 250 aconsejados),
+    // Dennis por debajo (180 vs 250).
+    expect(find.text('RITMO ACUMULADO'), findsNWidgets(2));
+    expect(find.text('150 km por encima'), findsOneWidget);
+    expect(find.text('70 km por debajo'), findsOneWidget);
+    expect(find.textContaining('aconsejado 250 km'), findsWidgets);
   });
 
   testWidgets('aviso de exceso visible con los km correctos', (tester) async {

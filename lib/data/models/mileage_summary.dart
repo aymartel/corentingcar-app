@@ -10,6 +10,7 @@ class PersonMileage {
     required this.remainingKm,
     required this.exceeded,
     required this.excessKm,
+    this.usedSinceStart = 0,
   });
 
   final User user;
@@ -27,6 +28,9 @@ class PersonMileage {
   /// Km de exceso a pagar (0 si no se ha superado).
   final int excessKm;
 
+  /// Km usados ACUMULADOS desde el primer uso (individual + su parte de compartidos).
+  final double usedSinceStart;
+
   factory PersonMileage.fromJson(JsonMap json) => PersonMileage(
     user: User.fromJson(asMap(json['user'])),
     individualKm: jInt(json['individualKm']),
@@ -34,6 +38,7 @@ class PersonMileage {
     remainingKm: jInt(json['remainingKm']),
     exceeded: jBool(json['exceeded']),
     excessKm: jInt(json['excessKm']),
+    usedSinceStart: jDoubleOrNull(json['usedSinceStart']) ?? 0,
   );
 
   JsonMap toJson() => {
@@ -43,6 +48,7 @@ class PersonMileage {
     'remainingKm': remainingKm,
     'exceeded': exceeded,
     'excessKm': excessKm,
+    'usedSinceStart': usedSinceStart,
   };
 }
 
@@ -54,6 +60,11 @@ class MileageSummary {
     required this.annualKmPerPerson,
     required this.sharedKm,
     required this.sharedKmPerPerson,
+    this.kmStartDate,
+    this.daysSinceStart = 0,
+    this.monthlyKmPerPerson = 0,
+    this.dailyKmPerPerson = 0,
+    this.recommendedToDate = 0,
   });
 
   /// Una entrada por persona (Andy y Dennis).
@@ -67,12 +78,28 @@ class MileageSummary {
   final double sharedKm;
   final double sharedKmPerPerson;
 
+  /// Fecha del primer uso (inicio del cómputo acumulado) y días transcurridos.
+  final String? kmStartDate;
+  final int daysSinceStart;
+
+  /// Cupo aconsejado por persona: mensual (= anual/12) y diario (referencia).
+  final int monthlyKmPerPerson;
+  final double dailyKmPerPerson;
+
+  /// Km aconsejados por persona ACUMULADOS hasta hoy desde el primer uso (cupo arrastrado).
+  final double recommendedToDate;
+
   factory MileageSummary.fromJson(JsonMap json) => MileageSummary(
     people: asMapList(json['perUser']).map(PersonMileage.fromJson).toList(),
     annualKmTotal: jInt(json['annualKmTotal']),
     annualKmPerPerson: jInt(json['annualKmPerPerson']),
     sharedKm: jDouble(json['sharedKm']),
     sharedKmPerPerson: jDouble(json['sharedKmPerPerson']),
+    kmStartDate: jStrOrNull(json['kmStartDate']),
+    daysSinceStart: jIntOrNull(json['daysSinceStart']) ?? 0,
+    monthlyKmPerPerson: jIntOrNull(json['monthlyKmPerPerson']) ?? 0,
+    dailyKmPerPerson: jDoubleOrNull(json['dailyKmPerPerson']) ?? 0,
+    recommendedToDate: jDoubleOrNull(json['recommendedToDate']) ?? 0,
   );
 
   JsonMap toJson() => {
@@ -81,5 +108,10 @@ class MileageSummary {
     'annualKmPerPerson': annualKmPerPerson,
     'sharedKm': sharedKm,
     'sharedKmPerPerson': sharedKmPerPerson,
+    'kmStartDate': kmStartDate,
+    'daysSinceStart': daysSinceStart,
+    'monthlyKmPerPerson': monthlyKmPerPerson,
+    'dailyKmPerPerson': dailyKmPerPerson,
+    'recommendedToDate': recommendedToDate,
   };
 }
