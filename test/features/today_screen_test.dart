@@ -1,5 +1,6 @@
 import 'package:coretingcar/common/theme/theme.dart';
 import 'package:coretingcar/data/api/api_exception.dart';
+import 'package:coretingcar/data/models/models.dart';
 import 'package:coretingcar/data/providers.dart';
 import 'package:coretingcar/features/today/today_screen.dart';
 import 'package:flutter/material.dart';
@@ -11,14 +12,16 @@ import '../helpers/fakes.dart';
 
 Future<void> _pumpToday(
   WidgetTester tester,
-  FakePriorityService priority,
-) async {
+  FakePriorityService priority, {
+  FakeUsageService? usage,
+}) async {
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
         priorityServiceProvider.overrideWithValue(priority),
         requestServiceProvider.overrideWithValue(FakeRequestService()),
         carStatusServiceProvider.overrideWithValue(FakeCarStatusService()),
+        if (usage != null) usageServiceProvider.overrideWithValue(usage),
       ],
       child: MaterialApp(theme: AppTheme.dark(), home: const TodayScreen()),
     ),
@@ -37,12 +40,27 @@ void main() {
       FakePriorityService(
         todayResult: priorityFor(user1, conflictPhrase: 'Hoy decide Andy.'),
       ),
+      usage: FakeUsageService(
+        usageList: const [
+          UsageLog(
+            id: 1,
+            userId: 1,
+            date: '2026-06-10',
+            startKm: 9785,
+            endKm: 12480,
+            totalKm: 2695,
+            type: EntryType.individual,
+          ),
+        ],
+      ),
     );
 
     expect(find.text('HOY TIENE PRIORIDAD'), findsOneWidget);
     expect(find.text('Andy'), findsWidgets);
     expect(find.text('Hoy decide Andy.'), findsOneWidget);
     expect(find.text('PEDIR COCHE'), findsOneWidget);
+    // Cuentakilómetros bajo el coche: última cifra registrada (12.480 km).
+    expect(find.text('12.480 km'), findsOneWidget);
 
     // Acción "Registrar uso" → abre el formulario (botón GUARDAR del sheet).
     await tester.tap(find.text('REGISTRAR USO'));

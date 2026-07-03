@@ -83,6 +83,17 @@ void main() {
     expect(expenses.lastDeletedSettlementId, 7);
   });
 
+  testWidgets('lavado: avisa cuántas veces seguidas le tocan', (tester) async {
+    final expenses = FakeExpensesService(
+      summaryResult: expensesSample(owedWashes: 2),
+    );
+    await _pumpExpenses(tester, expenses);
+
+    expect(find.text('LE TOCA A'), findsOneWidget);
+    expect(find.text('×2'), findsOneWidget);
+    expect(find.textContaining('2 veces seguidas'), findsOneWidget);
+  });
+
   testWidgets('error del backend muestra mensaje y reintento', (tester) async {
     await _pumpExpenses(
       tester,

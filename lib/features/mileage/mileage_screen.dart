@@ -90,9 +90,93 @@ class _MileageContent extends StatelessWidget {
   }
 }
 
-/// Barra de progreso estilo cuadro de mandos (track + relleno con degradado).
-class _ProgressBar extends StatelessWidget {
-  const _ProgressBar({required this.ratio, required this.fill});
+// Margen aconsejado (± km) antes de avisar: amplio en la anual, ajustado en la mensual.
+const double _annualToleranceKm = 500;
+const double _monthlyToleranceKm = 50;
+
+/// Color según la desviación `d = usado − aconsejado` y el margen `tol`:
+/// verde dentro de ±tol, rojo si te pasas +tol por encima, naranja si vas −tol por debajo.
+Color _deviationColor(double d, double tol) {
+  if (d > tol) return AppColors.danger;
+  if (d < -tol) return AppColors.warning;
+  return AppColors.success;
+}
+
+String _deviationText(double d) {
+  if (d.abs() < 0.5) return 'en línea';
+  return d > 0
+      ? '${EsFormat.km(d)} km por encima'
+      : '${EsFormat.km(-d)} km por debajo';
+}
+
+/// Barra de desviación: sobre el track, el GRIS marca lo aconsejado (altura
+/// completa, por donde debes ir) y encima una banda más fina con lo USADO
+/// (verde/naranja/rojo según desviación). Ambas se ven aunque se solapen.
+class _DeviationBar extends StatelessWidget {
+  const _DeviationBar({
+    required this.used,
+    required this.recommended,
+    required this.scale,
+    required this.tolerance,
+  });
+
+  final double used;
+  final double recommended;
+  final double scale;
+  final double tolerance;
+
+  @override
+  Widget build(BuildContext context) {
+    final s = scale <= 0 ? 1.0 : scale;
+    final usedRatio = (used / s).clamp(0.0, 1.0);
+    final recRatio = (recommended / s).clamp(0.0, 1.0);
+    final fill = _deviationColor(used - recommended, tolerance);
+
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: AppRadius.rsm,
+        border: Border.all(color: AppColors.outline),
+      ),
+      clipBehavior: Clip.antiAlias,
+      height: 16,
+      child: Stack(
+        children: [
+          // Aconsejado (gris), altura completa, detrás.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: recRatio,
+              child: ColoredBox(
+                color: AppColors.textMuted.withValues(alpha: 0.5),
+              ),
+            ),
+          ),
+          // Usado (color por desviación), banda más fina centrada, delante.
+          Align(
+            alignment: Alignment.centerLeft,
+            child: FractionallySizedBox(
+              widthFactor: usedRatio,
+              heightFactor: 0.55,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  borderRadius: AppRadius.rsm,
+                  gradient: LinearGradient(
+                    colors: [fill.withValues(alpha: 0.7), fill],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Barra de progreso simple (track + relleno). Para el resumen total del año.
+class _SimpleBar extends StatelessWidget {
+  const _SimpleBar({required this.ratio, required this.fill});
 
   final double ratio;
   final Color fill;
@@ -124,6 +208,64 @@ class _ProgressBar extends StatelessWidget {
   }
 }
 
+/// Bloque etiquetado: cabecera (título + desviación en color), la barra y el pie
+/// con las cifras (usado vs aconsejado). Reutilizado por la barra anual y la mensual.
+class _DeviationBlock extends StatelessWidget {
+  const _DeviationBlock({
+    required this.label,
+    required this.used,
+    required this.recommended,
+    required this.scale,
+    required this.tolerance,
+  });
+
+  final String label;
+  final double used;
+  final double recommended;
+  final double scale;
+  final double tolerance;
+
+  @override
+  Widget build(BuildContext context) {
+    final d = used - recommended;
+    final theme = Theme.of(context);
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTypography.hudLabel(),
+              ),
+            ),
+            Text(
+              _deviationText(d),
+              style: AppTypography.hudLabel(color: _deviationColor(d, tolerance)),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        _DeviationBar(
+          used: used,
+          recommended: recommended,
+          scale: scale,
+          tolerance: tolerance,
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          'Usado ${EsFormat.km(used)} · aconsejado ${EsFormat.km(recommended)} km',
+          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
+        ),
+      ],
+    );
+  }
+}
+
 class _PersonMileageCard extends StatelessWidget {
   const _PersonMileageCard({
     required this.person,
@@ -139,14 +281,9 @@ class _PersonMileageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final user = person.user;
     final color = colorFromHex(user.color) ?? personColor(user.profile);
-    final ratio = limit == 0 ? 0.0 : person.usedKm / limit;
-    final nearLimit = !person.exceeded && ratio >= 0.85;
-    final fill = person.exceeded
-        ? AppColors.danger
-        : nearLimit
-        ? AppColors.warning
-        : color;
     final theme = Theme.of(context);
+    final annualDiff = person.usedKm - summary.recommendedYearToDate;
+    final headerColor = _deviationColor(annualDiff, _annualToleranceKm);
 
     return GlowCard(
       accentColor: color,
@@ -170,13 +307,20 @@ class _PersonMileageCard extends StatelessWidget {
                 style: AppTypography.mono(
                   size: 15,
                   weight: FontWeight.w700,
-                  color: fill,
+                  color: headerColor,
                 ),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          _ProgressBar(ratio: ratio, fill: fill),
+          // Barra ANUAL (se reinicia el 1 de enero): usado vs aconsejado del año.
+          _DeviationBlock(
+            label: 'ANUAL',
+            used: person.usedKm.toDouble(),
+            recommended: summary.recommendedYearToDate,
+            scale: limit.toDouble(),
+            tolerance: _annualToleranceKm,
+          ),
           const SizedBox(height: AppSpacing.md),
           Row(
             children: [
@@ -194,9 +338,14 @@ class _PersonMileageCard extends StatelessWidget {
               ),
             ],
           ),
-          if (summary.kmStartDate != null) ...[
+          // Barra MENSUAL (se reinicia el día 1): carrusel por meses registrados.
+          if (summary.months.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),
-            _PaceSection(person: person, summary: summary, color: color),
+            _MonthlyCarousel(
+              months: summary.months,
+              userId: user.id,
+              monthlyBudget: summary.monthlyKmPerPerson,
+            ),
           ],
           if (person.exceeded) ...[
             const SizedBox(height: AppSpacing.md),
@@ -225,123 +374,113 @@ class _PersonMileageCard extends StatelessWidget {
   }
 }
 
-/// Ritmo ACUMULADO desde el primer uso: barra con lo aconsejado hasta hoy (gris,
-/// el cupo arrastrado) y lo realmente usado (color de la persona). Si el color
-/// supera al gris vas por encima (gastas tu colchón); si no, ahorras km.
-class _PaceSection extends StatelessWidget {
-  const _PaceSection({
-    required this.person,
-    required this.summary,
-    required this.color,
+/// Carrusel MENSUAL: una barra por mes registrado (se reinicia el día 1). Swipe
+/// horizontal para ver todos los meses; por defecto muestra el mes en curso.
+class _MonthlyCarousel extends StatefulWidget {
+  const _MonthlyCarousel({
+    required this.months,
+    required this.userId,
+    required this.monthlyBudget,
   });
 
-  final PersonMileage person;
-  final MileageSummary summary;
-  final Color color;
+  final List<MonthMileage> months;
+  final int userId;
+  final int monthlyBudget;
+
+  @override
+  State<_MonthlyCarousel> createState() => _MonthlyCarouselState();
+}
+
+class _MonthlyCarouselState extends State<_MonthlyCarousel> {
+  late final PageController _controller;
+  late int _page;
+
+  @override
+  void initState() {
+    super.initState();
+    _page = widget.months.length - 1; // por defecto el mes en curso (el último)
+    _controller = PageController(initialPage: _page);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final used = person.usedSinceStart;
-    final recommended = summary.recommendedToDate;
-    final diff = used - recommended;
-    final ahead = diff > 0; // por encima del ritmo aconsejado (consume colchón)
-    final statusColor = ahead ? AppColors.warning : AppColors.success;
-    final statusText = ahead
-        ? '${EsFormat.km(diff)} km por encima'
-        : '${EsFormat.km(-diff)} km por debajo';
-
+    final many = widget.months.length > 1;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           children: [
-            Text('RITMO ACUMULADO', style: AppTypography.hudLabel()),
+            Text('MENSUAL', style: AppTypography.hudLabel()),
             const Spacer(),
-            Text(
-              statusText,
-              style: AppTypography.hudLabel(color: statusColor),
-            ),
+            if (many)
+              const Icon(Icons.swipe_outlined, size: 15, color: AppColors.textMuted),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
-        _PaceBar(used: used, recommended: recommended, color: color),
-        const SizedBox(height: AppSpacing.sm),
-        Text(
-          'Usado ${EsFormat.km(used)} · aconsejado ${EsFormat.km(recommended)} km '
-          '(${summary.daysSinceStart} días desde el inicio)',
-          style: theme.textTheme.bodySmall,
+        SizedBox(
+          height: 80,
+          child: PageView.builder(
+            controller: _controller,
+            itemCount: widget.months.length,
+            onPageChanged: (i) => setState(() => _page = i),
+            itemBuilder: (context, i) {
+              final m = widget.months[i];
+              return _DeviationBlock(
+                label: _monthLabel(m.month),
+                used: m.usedFor(widget.userId),
+                recommended: m.recommendedPerPerson,
+                scale: widget.monthlyBudget.toDouble(),
+                tolerance: _monthlyToleranceKm,
+              );
+            },
+          ),
         ),
-        Text(
-          'Aconsejado · mes ${EsFormat.km(summary.monthlyKmPerPerson)} · '
-          'año ${EsFormat.km(summary.annualKmPerPerson)} km · '
-          '${EsFormat.decimal(summary.dailyKmPerPerson)}/día',
-          style: theme.textTheme.bodySmall?.copyWith(color: AppColors.textMuted),
-        ),
+        if (many) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _Dots(count: widget.months.length, active: _page),
+        ],
       ],
     );
   }
 }
 
-/// Barra de ritmo acumulado: escala = el mayor entre usado y aconsejado; gris =
-/// aconsejado hasta hoy (detrás); color del usuario = realmente usado (delante).
-/// Si el color supera al gris, vas por encima del ritmo.
-class _PaceBar extends StatelessWidget {
-  const _PaceBar({
-    required this.used,
-    required this.recommended,
-    required this.color,
-  });
+/// Etiqueta de un mes `YYYY-MM` en es-ES (p.ej. "JUNIO 2026").
+String _monthLabel(String yearMonth) {
+  final parts = yearMonth.split('-');
+  final y = int.tryParse(parts.first) ?? 2000;
+  final m = int.tryParse(parts.length > 1 ? parts[1] : '1') ?? 1;
+  return EsFormat.monthYear(DateTime(y, m)).toUpperCase();
+}
 
-  final double used;
-  final double recommended;
-  final Color color;
+/// Puntos indicadores del carrusel (el activo, alargado).
+class _Dots extends StatelessWidget {
+  const _Dots({required this.count, required this.active});
+
+  final int count;
+  final int active;
 
   @override
   Widget build(BuildContext context) {
-    final maxVal = used > recommended ? used : recommended;
-    final scale = maxVal <= 0 ? 1.0 : maxVal;
-    final usedRatio = (used / scale).clamp(0.0, 1.0);
-    final recRatio = (recommended / scale).clamp(0.0, 1.0);
-    final overPace = used > recommended;
-    final fill = overPace ? AppColors.warning : color;
-
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.surfaceAlt,
-        borderRadius: AppRadius.rsm,
-        border: Border.all(color: AppColors.outline),
-      ),
-      clipBehavior: Clip.antiAlias,
-      height: 14,
-      child: Stack(
-        children: [
-          // Aconsejado a hoy (gris, detrás).
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: recRatio,
-              child: ColoredBox(
-                color: AppColors.textMuted.withValues(alpha: 0.45),
-              ),
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        for (var i = 0; i < count; i++)
+          Container(
+            width: i == active ? 16 : 6,
+            height: 6,
+            margin: const EdgeInsets.symmetric(horizontal: 2),
+            decoration: BoxDecoration(
+              color: i == active ? AppColors.brand : AppColors.outlineStrong,
+              borderRadius: const BorderRadius.all(Radius.circular(3)),
             ),
           ),
-          // Realmente usado (color de la persona, delante).
-          Align(
-            alignment: Alignment.centerLeft,
-            child: FractionallySizedBox(
-              widthFactor: usedRatio,
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [fill.withValues(alpha: 0.6), fill],
-                  ),
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+      ],
     );
   }
 }
@@ -490,7 +629,7 @@ class _AnnualCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          _ProgressBar(ratio: ratio, fill: AppColors.brand),
+          _SimpleBar(ratio: ratio, fill: AppColors.brand),
           const SizedBox(height: AppSpacing.md),
           Text(
             '${EsFormat.km(summary.annualKmPerPerson)} km por persona al año. '

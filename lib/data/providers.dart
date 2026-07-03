@@ -80,3 +80,9 @@ final usersByIdProvider = Provider<AsyncValue<Map<int, User>>>(
       .watch(allUsersProvider)
       .whenData((users) => {for (final u in users) u.id: u}),
 );
+
+/// Odómetro actual del coche = mayor `endKm` registrado (la última cifra del
+/// cuentakilómetros). Se muestra en HOY. Se invalida al registrar un uso.
+final currentOdometerProvider = FutureProvider<int?>(
+  (ref) => ref.watch(usageServiceProvider).lastEndKm(),
+);

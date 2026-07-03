@@ -672,8 +672,8 @@ List<UseRequest> requestsSample() => const [
 /// Resumen de gastos de muestra: un repostaje compartido (Dennis, 25 €) + un
 /// "otro" compartido (Andy, 8 €) + un lavado. El saldo combinado (8,50 €) difiere
 /// del de solo-gasolina (12,50 €): Andy paga el peaje, reduciendo lo que debe.
-ExpensesSummary expensesSample() => const ExpensesSummary(
-  fuel: FuelSection(
+ExpensesSummary expensesSample({int owedWashes = 1}) => ExpensesSummary(
+  fuel: const FuelSection(
     list: [
       FuelEntry(
         log: FuelLog(
@@ -740,12 +740,13 @@ ExpensesSummary expensesSample() => const ExpensesSummary(
     toUser: user2,
   ),
   wash: WashSection(
-    last: WashEntry(
+    last: const WashEntry(
       log: WashLog(id: 9, userId: 1, date: '2026-05-20', costEur: 15.0),
       user: user1,
     ),
     nextWashUser: user2,
-    history: [
+    owedWashes: owedWashes,
+    history: const [
       WashEntry(
         log: WashLog(id: 9, userId: 1, date: '2026-05-20', costEur: 15.0),
         user: user1,
@@ -754,7 +755,9 @@ ExpensesSummary expensesSample() => const ExpensesSummary(
   ),
 );
 
-/// Resumen de km de muestra: Andy dentro de cupo, Dennis con exceso.
+/// Resumen de km de muestra: Andy en línea, Dennis con exceso. Aconsejado del año
+/// = 6.000: Andy (6.240) va +240 (verde, dentro de ±500); Dennis (8.430) va +2.430
+/// (rojo). Dos meses registrados para el carrusel (por defecto el último, julio).
 MileageSummary mileageSample() => const MileageSummary(
   people: [
     PersonMileage(
@@ -764,7 +767,6 @@ MileageSummary mileageSample() => const MileageSummary(
       remainingKm: 1260,
       exceeded: false,
       excessKm: 0,
-      usedSinceStart: 400, // por encima del ritmo (250 aconsejados acumulados)
     ),
     PersonMileage(
       user: user2,
@@ -773,7 +775,6 @@ MileageSummary mileageSample() => const MileageSummary(
       remainingKm: -930,
       exceeded: true,
       excessKm: 930,
-      usedSinceStart: 180, // por debajo del ritmo
     ),
   ],
   annualKmTotal: 15000,
@@ -781,10 +782,27 @@ MileageSummary mileageSample() => const MileageSummary(
   sharedKm: 120.5,
   sharedKmPerPerson: 60.25,
   kmStartDate: '2026-06-10',
-  daysSinceStart: 12,
   monthlyKmPerPerson: 625,
   dailyKmPerPerson: 20.8,
-  recommendedToDate: 250,
+  recommendedYearToDate: 6000,
+  months: [
+    MonthMileage(
+      month: '2026-06',
+      recommendedPerPerson: 437.5,
+      perUser: [
+        MonthUsage(userId: 1, used: 400),
+        MonthUsage(userId: 2, used: 700),
+      ],
+    ),
+    MonthMileage(
+      month: '2026-07',
+      recommendedPerPerson: 625,
+      perUser: [
+        MonthUsage(userId: 1, used: 500), // 125 por debajo (naranja)
+        MonthUsage(userId: 2, used: 900), // 275 por encima (rojo)
+      ],
+    ),
+  ],
 );
 
 /// Usos de muestra: uno de Andy (id 1) y uno de Dennis (id 2), odómetro continuo.

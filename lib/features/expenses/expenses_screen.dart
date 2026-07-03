@@ -573,8 +573,35 @@ class _WashCard extends StatelessWidget {
               Text('LE TOCA A', style: AppTypography.hudLabel()),
               const SizedBox(width: AppSpacing.sm),
               Text(wash.nextWashUser.name, style: theme.textTheme.titleMedium),
+              if (wash.owedWashes > 1) ...[
+                const SizedBox(width: AppSpacing.sm),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.sm,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.warning.withValues(alpha: 0.14),
+                    borderRadius: const BorderRadius.all(Radius.circular(999)),
+                    border: Border.all(color: AppColors.warning),
+                  ),
+                  child: Text(
+                    '×${wash.owedWashes}',
+                    style: AppTypography.hudLabel(color: AppColors.warning),
+                  ),
+                ),
+              ],
             ],
           ),
+          if (wash.owedWashes > 1) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Text(
+              'Le toca ${wash.owedWashes} veces seguidas (el otro lavó de más).',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
         ],
       ),
     );

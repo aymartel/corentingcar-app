@@ -7,6 +7,7 @@ import '../../common/widgets/brand/brand.dart';
 import '../../common/widgets/glow_card.dart';
 import '../../core/format/es_format.dart';
 import '../../data/models/models.dart';
+import '../../data/providers.dart';
 import '../car_status/car_status_card.dart';
 import '../car_status/car_status_controller.dart';
 import '../expenses/forms/forms.dart';
@@ -42,10 +43,13 @@ class TodayScreen extends ConsumerWidget {
       body: RefreshIndicator(
         color: AppColors.brand,
         backgroundColor: AppColors.surface,
-        onRefresh: () => Future.wait([
-          controller.refresh(),
-          ref.read(carStatusProvider.notifier).refresh(),
-        ]),
+        onRefresh: () {
+          ref.invalidate(currentOdometerProvider);
+          return Future.wait([
+            controller.refresh(),
+            ref.read(carStatusProvider.notifier).refresh(),
+          ]);
+        },
         child: AsyncStateView<DailyPriority>(
           value: async,
           onRetry: controller.refresh,
@@ -162,11 +166,18 @@ class _PriorityHero extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: AppSpacing.sm),
-                // El coche junto al texto de prioridad.
-                Image.asset(
-                  'assets/brand/car_logo.png',
-                  height: 62,
-                  fit: BoxFit.contain,
+                // El coche junto al texto de prioridad, con el cuentakilómetros debajo.
+                Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/brand/car_logo.png',
+                      height: 62,
+                      fit: BoxFit.contain,
+                    ),
+                    const SizedBox(height: AppSpacing.xs),
+                    const _CarOdometer(),
+                  ],
                 ),
               ],
             ),
@@ -176,6 +187,38 @@ class _PriorityHero extends StatelessWidget {
             Text(phrase, style: theme.textTheme.bodyMedium),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Cuentakilómetros del coche: última cifra registrada (mayor `endKm`). Se muestra
+/// bajo el coche en HOY. Silencioso si aún no hay lectura (sin usos / sin conexión).
+class _CarOdometer extends ConsumerWidget {
+  const _CarOdometer();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final odometer = ref.watch(currentOdometerProvider).asData?.value;
+    if (odometer == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.sm, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceAlt,
+        borderRadius: const BorderRadius.all(Radius.circular(6)),
+        border: Border.all(color: AppColors.outlineStrong),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.speed_outlined, size: 12, color: AppColors.textMuted),
+          const SizedBox(width: 4),
+          Text(
+            '${EsFormat.km(odometer)} km',
+            style: AppTypography.odometer(size: 13, color: AppColors.textSecondary),
+          ),
+        ],
       ),
     );
   }

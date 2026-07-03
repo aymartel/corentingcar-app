@@ -206,6 +206,7 @@ class _UsageFormState extends ConsumerState<UsageForm> {
     ref.invalidate(usageHistoryControllerProvider);
     ref.invalidate(usageChangesControllerProvider);
     ref.invalidate(pendingUsageChangesProvider);
+    ref.invalidate(currentOdometerProvider); // refresca el cuentakilómetros de HOY
   }
 
   void _close(UsageFormOutcome outcome) {

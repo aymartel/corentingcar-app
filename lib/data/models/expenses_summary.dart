@@ -194,27 +194,34 @@ class SettlementSection {
   JsonMap toJson() => {'list': list.map((e) => e.toJson()).toList()};
 }
 
-/// Sección de lavado: último, a quién le toca el próximo (alternancia) e historial.
+/// Sección de lavado: último, a quién le toca el próximo (alternancia compensada) e historial.
 class WashSection {
   const WashSection({
     required this.last,
     required this.nextWashUser,
     required this.history,
+    this.owedWashes = 1,
   });
 
   final WashEntry? last;
   final User nextWashUser;
+
+  /// Veces SEGUIDAS que le tocan al próximo (>1 si va por detrás porque el otro lavó de más).
+  final int owedWashes;
+
   final List<WashEntry> history;
 
   factory WashSection.fromJson(JsonMap json) => WashSection(
     last: json['last'] == null ? null : WashEntry.fromJson(asMap(json['last'])),
     nextWashUser: User.fromJson(asMap(json['nextWashUser'])),
+    owedWashes: jIntOrNull(json['owedWashes']) ?? 1,
     history: asMapList(json['history']).map(WashEntry.fromJson).toList(),
   );
 
   JsonMap toJson() => {
     'last': last?.toJson(),
     'nextWashUser': nextWashUser.toJson(),
+    'owedWashes': owedWashes,
     'history': history.map((e) => e.toJson()).toList(),
   };
 }
