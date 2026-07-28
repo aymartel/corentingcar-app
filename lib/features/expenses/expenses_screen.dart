@@ -5,6 +5,7 @@ import '../../common/theme/theme.dart';
 import '../../common/widgets/async_views.dart';
 import '../../common/widgets/glow_card.dart';
 import '../../core/format/es_format.dart';
+import '../../data/api/api_exception.dart';
 import '../../data/models/models.dart';
 import '../../data/providers.dart';
 import 'expenses_controller.dart';
@@ -47,6 +48,7 @@ class _ExpensesContent extends StatelessWidget {
   Widget build(BuildContext context) {
     final fuel = summary.fuel;
     final other = summary.other;
+    final incidents = summary.incidents;
     final settlements = summary.settlements;
     final wash = summary.wash;
 
@@ -57,6 +59,16 @@ class _ExpensesContent extends StatelessWidget {
         const _ActionsRow(),
         const SizedBox(height: AppSpacing.xl),
         _BalanceCard(balance: summary.balance),
+        // INCIDENCIAS va lo primero: no es un histórico más, es lo que hay que tener
+        // controlado antes de devolver el coche.
+        const SizedBox(height: AppSpacing.xl),
+        _IncidentsHeader(incidents: incidents),
+        const SizedBox(height: AppSpacing.md),
+        if (incidents.list.isEmpty)
+          _EmptyNote(text: 'Sin incidencias. Todo en orden.')
+        else
+          for (final incident in incidents.list)
+            _IncidentTile(incident: incident),
         const SizedBox(height: AppSpacing.xl),
         Text('GASOLINA', style: AppTypography.hudLabel()),
         const SizedBox(height: AppSpacing.md),
@@ -153,6 +165,18 @@ class _ActionsRow extends ConsumerWidget {
                 label: 'Pago',
                 onTap: () =>
                     _handle(context, openSettlementForm, 'Pago registrado.'),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.md),
+            Expanded(
+              child: _ActionTile(
+                icon: Icons.report_problem_outlined,
+                label: 'Incidencia',
+                onTap: () => _handle(
+                  context,
+                  (ctx) => openIncidentForm(ctx),
+                  'Incidencia registrada.',
+                ),
               ),
             ),
           ],
@@ -386,6 +410,261 @@ class _FuelSplitLines extends StatelessWidget {
           ),
           Text(EsFormat.euro(p.shareEur), style: AppTypography.mono(size: 12)),
         ],
+      ),
+    );
+  }
+}
+
+/// Cabecera de la sección de incidencias, con el contador de abiertas y su coste previsto.
+class _IncidentsHeader extends StatelessWidget {
+  const _IncidentsHeader({required this.incidents});
+
+  final IncidentSection incidents;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final open = incidents.openCount;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Text('INCIDENCIAS', style: AppTypography.hudLabel()),
+            const Spacer(),
+            if (open > 0)
+              _Pill(
+                label: open == 1 ? '1 ABIERTA' : '$open ABIERTAS',
+                color: AppColors.warning,
+              ),
+          ],
+        ),
+        if (incidents.pendingAmountEur > 0) ...[
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Previsto ${EsFormat.euro(incidents.pendingAmountEur)} · aún no cuenta en el saldo',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppColors.textMuted,
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Una incidencia del historial, con sus acciones (resolver / editar / borrar).
+class _IncidentTile extends ConsumerWidget {
+  const _IncidentTile({required this.incident});
+
+  final Incident incident;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = Theme.of(context);
+    final user = incident.reportedBy;
+    final color = colorFromHex(user.color) ?? personColor(user.profile);
+    final amount = incident.amountEur;
+    final open = incident.isOpen;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+      child: GlowCard(
+        padding: const EdgeInsets.all(AppSpacing.md),
+        accentColor: open ? AppColors.warning : null,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: Text(
+                    incident.description,
+                    style: theme.textTheme.bodyLarge,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Text(
+                  amount == null ? 'Sin importe' : EsFormat.euro(amount),
+                  style: amount == null
+                      ? theme.textTheme.bodySmall?.copyWith(
+                          color: AppColors.textMuted,
+                        )
+                      : AppTypography.mono(size: 15, weight: FontWeight.w700),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              children: [
+                _Pill(
+                  label: incident.kind.label.toUpperCase(),
+                  color: _kindColor(incident.kind),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                _Pill(
+                  label: open ? 'ABIERTA' : 'RESUELTA',
+                  color: open ? AppColors.warning : AppColors.success,
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    _dateLabel(incident.date),
+                    style: theme.textTheme.bodySmall,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            Text(_detailLine(incident), style: theme.textTheme.bodySmall),
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                if (open)
+                  TextButton.icon(
+                    onPressed: () => _resolve(context),
+                    icon: const Icon(Icons.check_circle_outline, size: 16),
+                    label: const Text('RESOLVER'),
+                  )
+                else
+                  TextButton.icon(
+                    onPressed: () => _reopen(context, ref),
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('REABRIR'),
+                  ),
+                const Spacer(),
+                IconButton(
+                  tooltip: 'Editar incidencia',
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  color: AppColors.textMuted,
+                  onPressed: () => openIncidentForm(context, edit: incident),
+                ),
+                IconButton(
+                  tooltip: 'Eliminar incidencia',
+                  icon: const Icon(Icons.delete_outline, size: 18),
+                  color: AppColors.textMuted,
+                  onPressed: () => _confirmDelete(context, ref),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Línea explicativa: quién la asume y, si está resuelta, quién puso el dinero.
+  String _detailLine(Incident incident) {
+    final who = incident.type.isShared
+        ? 'Compartida 50/50'
+        : 'La asume ${incident.responsible?.name ?? incident.reportedBy.name}';
+    if (incident.isOpen) {
+      return incident.amountEur == null
+          ? '$who · registrada por ${incident.reportedBy.name}'
+          : '$who · previsto, aún no está en el saldo';
+    }
+    final payer = incident.paidBy?.name;
+    return payer == null ? '$who · sin coste' : '$who · la pagó $payer';
+  }
+
+  Future<void> _resolve(BuildContext context) async {
+    final ok = await openIncidentResolveForm(context, incident: incident);
+    if (ok == true && context.mounted) {
+      ScaffoldMessenger.of(context)
+        ..hideCurrentSnackBar()
+        ..showSnackBar(const SnackBar(content: Text('Incidencia resuelta.')));
+    }
+  }
+
+  Future<void> _reopen(BuildContext context, WidgetRef ref) async {
+    try {
+      await ref.read(expensesServiceProvider).reopenIncident(incident.id);
+      ref.invalidate(expensesControllerProvider);
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context, WidgetRef ref) async {
+    final countsInBalance = !incident.isOpen && incident.amountEur != null;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        backgroundColor: AppColors.surfaceHigh,
+        title: const Text('¿Eliminar incidencia?'),
+        content: Text(
+          countsInBalance
+              ? 'Su importe dejará de contar en el saldo.'
+              : 'Se eliminará del historial.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancelar'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: AppColors.danger),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('ELIMINAR'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await ref.read(expensesServiceProvider).deleteIncident(incident.id);
+      ref.invalidate(expensesControllerProvider);
+    } on ApiException catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context)
+          ..hideCurrentSnackBar()
+          ..showSnackBar(SnackBar(content: Text(e.message)));
+      }
+    }
+  }
+}
+
+Color _kindColor(IncidentKind kind) => switch (kind) {
+  IncidentKind.fine => AppColors.danger,
+  IncidentKind.damage => AppColors.warning,
+  IncidentKind.breakdown => AppColors.info,
+  IncidentKind.other => AppColors.textSecondary,
+};
+
+/// Píldora de etiqueta (tipo de incidencia, estado, contador). Mismo estilo que `_TypeChip`.
+class _Pill extends StatelessWidget {
+  const _Pill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpacing.sm,
+        vertical: 2,
+      ),
+      decoration: BoxDecoration(
+        borderRadius: const BorderRadius.all(Radius.circular(999)),
+        border: Border.all(color: color),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.hudLabel(color: color).copyWith(fontSize: 9),
       ),
     );
   }

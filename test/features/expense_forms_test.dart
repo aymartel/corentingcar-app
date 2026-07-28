@@ -18,6 +18,13 @@ Future<void> _pumpLauncher(
   FakeUsageService? usage,
   FakeAuthService? auth,
 }) async {
+  // Ventana alta: algunos formularios (incidencia) no caben en el viewport por defecto y su
+  // botón de guardar quedaría fuera de pantalla, sin poder pulsarlo.
+  tester.view.physicalSize = const Size(1000, 2400);
+  tester.view.devicePixelRatio = 1.0;
+  addTearDown(tester.view.resetPhysicalSize);
+  addTearDown(tester.view.resetDevicePixelRatio);
+
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
@@ -159,6 +166,113 @@ void main() {
 
     expect(expenses.otherCalls, 1);
     expect(find.text('GUARDAR'), findsNothing); // el sheet se cerró
+  });
+
+  testWidgets('incidencia: descripción vacía no envía', (tester) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(
+      tester,
+      opener: (ctx) => openIncidentForm(ctx),
+      expenses: expenses,
+      auth: FakeAuthService(),
+    );
+
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pump();
+
+    expect(find.text('Descripción obligatoria'), findsOneWidget);
+    expect(expenses.incidentCalls, 0);
+  });
+
+  testWidgets('incidencia: se registra SIN importe (el caso normal)', (
+    tester,
+  ) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(
+      tester,
+      opener: (ctx) => openIncidentForm(ctx),
+      expenses: expenses,
+      auth: FakeAuthService(),
+    );
+
+    final fields = find.byType(TextField);
+    await tester.enterText(fields.at(0), 'Rayada puerta trasera');
+    // El importe (fields.at(1)) se deja vacío a propósito.
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(expenses.incidentCalls, 1);
+    expect(expenses.lastIncidentAmount, isNull);
+    expect(expenses.lastIncidentType, EntryType.shared);
+    // Compartida → no se envía responsable.
+    expect(expenses.lastIncidentResponsible, isNull);
+  });
+
+  testWidgets('incidencia: el responsable solo aparece con reparto individual', (
+    tester,
+  ) async {
+    final expenses = FakeExpensesService();
+    await _pumpLauncher(
+      tester,
+      opener: (ctx) => openIncidentForm(ctx),
+      expenses: expenses,
+      auth: FakeAuthService(),
+    );
+
+    expect(find.text('LA GENERÓ'), findsNothing);
+
+    await tester.tap(find.text('Individual'));
+    await tester.pumpAndSettle();
+    expect(find.text('LA GENERÓ'), findsOneWidget);
+
+    // Se elige a Dennis como responsable y se envía explícito.
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dennis'));
+    await tester.enterText(find.byType(TextField).at(0), 'Multa zona azul');
+    await tester.enterText(find.byType(TextField).at(1), '90');
+    await tester.tap(find.text('GUARDAR'));
+    await tester.pumpAndSettle();
+
+    expect(expenses.incidentCalls, 1);
+    expect(expenses.lastIncidentType, EntryType.individual);
+    expect(expenses.lastIncidentResponsible, user2.id);
+    expect(expenses.lastIncidentAmount, 90);
+  });
+
+  testWidgets('resolver: envía el importe final y quién lo pagó', (
+    tester,
+  ) async {
+    final expenses = FakeExpensesService();
+    const incident = Incident(
+      id: 10,
+      date: '2026-07-28',
+      kind: IncidentKind.damage,
+      description: 'Rayada puerta trasera',
+      type: EntryType.shared,
+      status: IncidentStatus.open,
+      reportedBy: user1,
+    );
+    await _pumpLauncher(
+      tester,
+      opener: (ctx) => openIncidentResolveForm(ctx, incident: incident),
+      expenses: expenses,
+      auth: FakeAuthService(),
+    );
+
+    // Sin importe no hay a quién atribuir el pago.
+    expect(find.text('QUIÉN LO PAGÓ'), findsNothing);
+
+    await tester.enterText(find.byType(TextField).first, '340');
+    await tester.pumpAndSettle();
+    expect(find.text('QUIÉN LO PAGÓ'), findsOneWidget);
+    expect(find.text('Se repartirá 50/50 en el saldo.'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, 'Dennis'));
+    await tester.tap(find.text('RESOLVER'));
+    await tester.pumpAndSettle();
+
+    expect(expenses.resolveIncidentCalls, 1);
+    expect(expenses.lastResolvedAmount, 340);
+    expect(expenses.lastResolvedPaidBy, user2.id);
   });
 
   testWidgets('pago: registra un pago de Dennis a Andy y ajusta from→to', (

@@ -90,4 +90,86 @@ class ExpensesService {
   Future<void> deleteSettlement(int id) async {
     await _api.delete('/settlements/$id');
   }
+
+  // --- Incidencias (multas, golpes, averías) ---
+
+  /// `GET /api/incidents` — abiertas primero. Normalmente basta con `summary()`.
+  Future<List<Incident>> incidents({IncidentStatus? status}) async {
+    final data = await _api.get(
+      '/incidents',
+      query: status == null ? null : {'status': status.toJson()},
+    );
+    return asMapList(data).map(Incident.fromJson).toList();
+  }
+
+  /// `POST /api/incidents` — nace ABIERTA. El importe es opcional.
+  Future<Incident> addIncident({
+    required String date,
+    required IncidentKind kind,
+    required String description,
+    required EntryType type,
+    double? amountEur,
+    int? responsibleUserId,
+  }) async {
+    final data = await _api.post(
+      '/incidents',
+      body: {
+        'date': date,
+        'kind': kind.toJson(),
+        'description': description,
+        'type': type.toJson(),
+        'amountEur': ?amountEur,
+        'responsibleUserId': ?responsibleUserId,
+      },
+    );
+    return Incident.fromJson(asMap(data));
+  }
+
+  /// `PATCH /api/incidents/:id` — edición parcial (p.ej. ponerle el importe).
+  Future<Incident> updateIncident(
+    int id, {
+    String? date,
+    IncidentKind? kind,
+    String? description,
+    EntryType? type,
+    double? amountEur,
+    int? responsibleUserId,
+  }) async {
+    final data = await _api.patch(
+      '/incidents/$id',
+      body: {
+        'date': ?date,
+        'kind': ?kind?.toJson(),
+        'description': ?description,
+        'type': ?type?.toJson(),
+        'amountEur': ?amountEur,
+        'responsibleUserId': ?responsibleUserId,
+      },
+    );
+    return Incident.fromJson(asMap(data));
+  }
+
+  /// `PATCH /api/incidents/:id/resolve` — ya pagada o reparada: entra en el saldo.
+  Future<Incident> resolveIncident(
+    int id, {
+    int? paidBy,
+    double? amountEur,
+  }) async {
+    final data = await _api.patch(
+      '/incidents/$id/resolve',
+      body: {'paidBy': ?paidBy, 'amountEur': ?amountEur},
+    );
+    return Incident.fromJson(asMap(data));
+  }
+
+  /// `PATCH /api/incidents/:id/reopen` — su importe sale del saldo.
+  Future<Incident> reopenIncident(int id) async {
+    final data = await _api.patch('/incidents/$id/reopen');
+    return Incident.fromJson(asMap(data));
+  }
+
+  /// `DELETE /api/incidents/:id`
+  Future<void> deleteIncident(int id) async {
+    await _api.delete('/incidents/$id');
+  }
 }

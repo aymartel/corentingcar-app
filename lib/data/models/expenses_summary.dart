@@ -1,4 +1,5 @@
 import 'fuel_log.dart';
+import 'incident.dart';
 import 'json_utils.dart';
 import 'other_expense_log.dart';
 import 'settlement.dart';
@@ -178,6 +179,50 @@ class OtherSection {
   };
 }
 
+/// Sección de incidencias del coche (multas, golpes, averías).
+///
+/// Solo las RESUELTAS con importe entran en el saldo; las abiertas se muestran como previsión
+/// (ver [pendingAmountEur]). Son lo que hay que revisar antes de devolver el coche.
+class IncidentSection {
+  const IncidentSection({
+    required this.list,
+    required this.totalPerUser,
+    this.openCount = 0,
+    this.pendingAmountEur = 0,
+  });
+
+  final List<Incident> list;
+
+  /// Cuántas siguen abiertas.
+  final int openCount;
+
+  /// Coste previsto de las abiertas. Aún NO cuenta en el saldo.
+  final double pendingAmountEur;
+
+  /// Lo desembolsado por cada uno en incidencias ya resueltas.
+  final List<ExpenseTotal> totalPerUser;
+
+  /// Sección vacía (backend antiguo sin la clave `incidents`).
+  factory IncidentSection.empty() =>
+      const IncidentSection(list: [], totalPerUser: []);
+
+  factory IncidentSection.fromJson(JsonMap json) => IncidentSection(
+    list: asMapList(json['list']).map(Incident.fromJson).toList(),
+    openCount: jIntOrNull(json['openCount']) ?? 0,
+    pendingAmountEur: jDoubleOrNull(json['pendingAmountEur']) ?? 0,
+    totalPerUser: json['totalPerUser'] == null
+        ? const []
+        : asMapList(json['totalPerUser']).map(ExpenseTotal.fromJson).toList(),
+  );
+
+  JsonMap toJson() => {
+    'list': list.map((e) => e.toJson()).toList(),
+    'openCount': openCount,
+    'pendingAmountEur': pendingAmountEur,
+    'totalPerUser': totalPerUser.map((t) => t.toJson()).toList(),
+  };
+}
+
 /// Sección de pagos directos (saldar cuentas) entre los 2 usuarios.
 class SettlementSection {
   const SettlementSection({required this.list});
@@ -230,16 +275,20 @@ class WashSection {
 /// combinado (gasolina + otros). Tolerante a backend antiguo: si falta `other`
 /// la sección queda vacía y si falta `balance` cae al alias `fuel.balance`.
 class ExpensesSummary {
-  const ExpensesSummary({
+  ExpensesSummary({
     required this.fuel,
     required this.other,
     required this.settlements,
     required this.balance,
     required this.wash,
-  });
+    IncidentSection? incidents,
+  }) : incidents = incidents ?? const IncidentSection(list: [], totalPerUser: []);
 
   final FuelSection fuel;
   final OtherSection other;
+
+  /// Incidencias del coche. Vacía si el backend es anterior a esta feature.
+  final IncidentSection incidents;
   final SettlementSection settlements;
   final ExpenseBalance balance;
   final WashSection wash;
@@ -251,6 +300,9 @@ class ExpensesSummary {
       other: json['other'] == null
           ? OtherSection.empty()
           : OtherSection.fromJson(asMap(json['other'])),
+      incidents: json['incidents'] == null
+          ? IncidentSection.empty()
+          : IncidentSection.fromJson(asMap(json['incidents'])),
       settlements: json['settlements'] == null
           ? SettlementSection.empty()
           : SettlementSection.fromJson(asMap(json['settlements'])),
@@ -264,6 +316,7 @@ class ExpensesSummary {
   JsonMap toJson() => {
     'fuel': fuel.toJson(),
     'other': other.toJson(),
+    'incidents': incidents.toJson(),
     'settlements': settlements.toJson(),
     'balance': balance.toJson(),
     'wash': wash.toJson(),

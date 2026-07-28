@@ -2,12 +2,16 @@ import 'package:flutter/material.dart';
 
 import '../../../data/models/models.dart';
 import 'fuel_form.dart';
+import 'incident_form.dart';
+import 'incident_resolve_form.dart';
 import 'other_expense_form.dart';
 import 'settlement_form.dart';
 import 'usage_form.dart';
 import 'wash_form.dart';
 
 export 'fuel_form.dart';
+export 'incident_form.dart';
+export 'incident_resolve_form.dart';
 export 'other_expense_form.dart';
 export 'settlement_form.dart';
 export 'usage_form.dart';
@@ -30,6 +34,17 @@ Future<bool?> openFuelForm(BuildContext context) =>
 /// Abre el formulario de **registrar lavado**. Devuelve `true` si se guardó.
 Future<bool?> openWashForm(BuildContext context) =>
     _openForm<bool>(context, const WashForm());
+
+/// Abre el formulario de **incidencia** (multa, golpe, avería…). Sin [edit] registra una nueva;
+/// con [edit] la modifica (p.ej. para ponerle el importe). Devuelve `true` si se guardó.
+Future<bool?> openIncidentForm(BuildContext context, {Incident? edit}) =>
+    _openForm<bool>(context, IncidentForm(edit: edit));
+
+/// Abre la hoja de **resolver incidencia** (ya pagada o reparada): es cuando entra en el saldo.
+Future<bool?> openIncidentResolveForm(
+  BuildContext context, {
+  required Incident incident,
+}) => _openForm<bool>(context, IncidentResolveForm(incident: incident));
 
 /// Abre el formulario de **registrar otro gasto**. Devuelve `true` si se guardó.
 Future<bool?> openOtherExpenseForm(BuildContext context) =>

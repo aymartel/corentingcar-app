@@ -421,11 +421,124 @@ class FakeExpensesService extends ExpensesService {
   double? lastSettlementAmount;
   int? lastDeletedSettlementId;
 
+  int incidentCalls = 0;
+  int updateIncidentCalls = 0;
+  int resolveIncidentCalls = 0;
+  int reopenIncidentCalls = 0;
+  int deleteIncidentCalls = 0;
+  IncidentKind? lastIncidentKind;
+  double? lastIncidentAmount;
+  EntryType? lastIncidentType;
+  int? lastIncidentResponsible;
+  int? lastResolvedPaidBy;
+  double? lastResolvedAmount;
+  int? lastDeletedIncidentId;
+
   @override
   Future<ExpensesSummary> summary() async {
     await Future<void>.delayed(Duration.zero);
     if (summaryError != null) throw summaryError!;
     return summaryResult!;
+  }
+
+  @override
+  Future<Incident> addIncident({
+    required String date,
+    required IncidentKind kind,
+    required String description,
+    required EntryType type,
+    double? amountEur,
+    int? responsibleUserId,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    incidentCalls++;
+    lastIncidentKind = kind;
+    lastIncidentAmount = amountEur;
+    lastIncidentType = type;
+    lastIncidentResponsible = responsibleUserId;
+    return Incident(
+      id: 99,
+      date: date,
+      kind: kind,
+      description: description,
+      amountEur: amountEur,
+      type: type,
+      status: IncidentStatus.open,
+      reportedBy: user1,
+    );
+  }
+
+  @override
+  Future<Incident> updateIncident(
+    int id, {
+    String? date,
+    IncidentKind? kind,
+    String? description,
+    EntryType? type,
+    double? amountEur,
+    int? responsibleUserId,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    updateIncidentCalls++;
+    lastIncidentAmount = amountEur;
+    lastIncidentType = type;
+    lastIncidentResponsible = responsibleUserId;
+    return Incident(
+      id: id,
+      date: date ?? '2026-07-28',
+      kind: kind ?? IncidentKind.damage,
+      description: description ?? 'x',
+      amountEur: amountEur,
+      type: type ?? EntryType.shared,
+      status: IncidentStatus.open,
+      reportedBy: user1,
+    );
+  }
+
+  @override
+  Future<Incident> resolveIncident(
+    int id, {
+    int? paidBy,
+    double? amountEur,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    resolveIncidentCalls++;
+    lastResolvedPaidBy = paidBy;
+    lastResolvedAmount = amountEur;
+    return Incident(
+      id: id,
+      date: '2026-07-28',
+      kind: IncidentKind.damage,
+      description: 'x',
+      amountEur: amountEur,
+      type: EntryType.shared,
+      status: IncidentStatus.resolved,
+      reportedBy: user1,
+      paidBy: paidBy == user2.id ? user2 : user1,
+    );
+  }
+
+  @override
+  Future<Incident> reopenIncident(int id) async {
+    await Future<void>.delayed(Duration.zero);
+    reopenIncidentCalls++;
+    return Incident(
+      id: id,
+      date: '2026-07-28',
+      kind: IncidentKind.damage,
+      description: 'x',
+      amountEur: null,
+      type: EntryType.shared,
+      status: IncidentStatus.open,
+      reportedBy: user1,
+    );
+  }
+
+  @override
+  Future<void> deleteIncident(int id) async {
+    await Future<void>.delayed(Duration.zero);
+    deleteIncidentCalls++;
+    lastDeletedIncidentId = id;
   }
 
   @override
@@ -784,6 +897,41 @@ List<UseRequest> requestsSample() => const [
   ),
 ];
 
+/// Incidencias de muestra: una ABIERTA sin importe (el caso típico: pasó algo y aún no se sabe
+/// el coste) y una RESUELTA que sí cuenta en el saldo.
+IncidentSection incidentsSample() => const IncidentSection(
+  list: [
+    Incident(
+      id: 10,
+      date: '2026-07-28',
+      kind: IncidentKind.damage,
+      description: 'Rayada puerta trasera',
+      type: EntryType.shared,
+      status: IncidentStatus.open,
+      reportedBy: user1,
+    ),
+    Incident(
+      id: 11,
+      date: '2026-07-12',
+      kind: IncidentKind.fine,
+      description: 'Multa zona azul',
+      amountEur: 90,
+      type: EntryType.individual,
+      status: IncidentStatus.resolved,
+      reportedBy: user1,
+      responsible: user2,
+      paidBy: user1,
+      resolvedAt: '2026-07-15 10:00:00',
+    ),
+  ],
+  openCount: 1,
+  pendingAmountEur: 0,
+  totalPerUser: [
+    ExpenseTotal(user: user1, totalEur: 90),
+    ExpenseTotal(user: user2, totalEur: 0),
+  ],
+);
+
 /// Resumen de gastos de muestra: un repostaje compartido (Dennis, 25 €) + un
 /// "otro" compartido (Andy, 8 €) + un lavado. El saldo combinado (8,50 €) difiere
 /// del de solo-gasolina (12,50 €): Andy paga el peaje, reduciendo lo que debe.
@@ -813,6 +961,7 @@ ExpensesSummary expensesSample({int owedWashes = 1}) => ExpensesSummary(
       toUser: user2,
     ),
   ),
+  incidents: incidentsSample(),
   other: OtherSection(
     list: [
       OtherExpenseEntry(

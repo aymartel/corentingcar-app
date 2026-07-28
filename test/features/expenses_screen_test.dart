@@ -94,6 +94,58 @@ void main() {
     expect(find.textContaining('2 veces seguidas'), findsOneWidget);
   });
 
+  testWidgets('sección de incidencias: contador, tipos y estado', (
+    tester,
+  ) async {
+    await _pumpExpenses(
+      tester,
+      FakeExpensesService(summaryResult: expensesSample()),
+    );
+
+    expect(find.text('INCIDENCIAS'), findsOneWidget);
+    expect(find.text('1 ABIERTA'), findsOneWidget);
+    // La abierta aún no tiene importe y así se dice.
+    expect(find.text('Rayada puerta trasera'), findsOneWidget);
+    expect(find.text('Sin importe'), findsOneWidget);
+    expect(find.text('ABIERTA'), findsOneWidget);
+    expect(find.text('GOLPE'), findsOneWidget);
+    // La resuelta: individual, la asume Dennis aunque la pagó Andy.
+    expect(find.text('Multa zona azul'), findsOneWidget);
+    expect(find.text('RESUELTA'), findsOneWidget);
+    expect(find.text('MULTA'), findsOneWidget);
+    expect(find.text('La asume Dennis · la pagó Andy'), findsOneWidget);
+    // Acciones por estado.
+    expect(find.text('RESOLVER'), findsOneWidget);
+    expect(find.text('REABRIR'), findsOneWidget);
+  });
+
+  testWidgets('borrar una incidencia pide confirmación y llama al servicio', (
+    tester,
+  ) async {
+    final expenses = FakeExpensesService(summaryResult: expensesSample());
+    await _pumpExpenses(tester, expenses);
+
+    await tester.tap(find.byTooltip('Eliminar incidencia').first);
+    await tester.pumpAndSettle();
+    expect(find.text('¿Eliminar incidencia?'), findsOneWidget);
+
+    await tester.tap(find.text('ELIMINAR'));
+    await tester.pumpAndSettle();
+    expect(expenses.deleteIncidentCalls, 1);
+    expect(expenses.lastDeletedIncidentId, 10);
+  });
+
+  testWidgets('reabrir una resuelta llama al servicio', (tester) async {
+    final expenses = FakeExpensesService(summaryResult: expensesSample());
+    await _pumpExpenses(tester, expenses);
+
+    await tester.tap(find.text('REABRIR'));
+    for (var i = 0; i < 6; i++) {
+      await tester.pump(const Duration(milliseconds: 20));
+    }
+    expect(expenses.reopenIncidentCalls, 1);
+  });
+
   testWidgets('error del backend muestra mensaje y reintento', (tester) async {
     await _pumpExpenses(
       tester,

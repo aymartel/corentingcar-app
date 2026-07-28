@@ -350,6 +350,89 @@ void main() {
       expect(exp.other.totalPerUser, isEmpty);
       expect(exp.balance.amountEur, exp.fuel.balance.amountEur);
       expect(exp.balance.amountEur, 12.5);
+      // Y la de incidencias también queda vacía (backend anterior a esa feature).
+      expect(exp.incidents.list, isEmpty);
+      expect(exp.incidents.openCount, 0);
+      expect(exp.incidents.pendingAmountEur, 0);
+    });
+
+    test('incidencias: importe nulo y personas anidadas', () {
+      final exp = ExpensesSummary.fromJson({
+        'fuel': {
+          'list': const [],
+          'totalPerUser': const [],
+          'balance': {
+            'settled': true,
+            'amountEur': 0,
+            'fromUser': null,
+            'toUser': null,
+          },
+        },
+        'wash': {'last': null, 'nextWashUser': user2Json, 'history': const []},
+        'incidents': {
+          'list': [
+            {
+              'id': 10,
+              'date': '2026-07-28',
+              'kind': 'damage',
+              'description': 'Rayada puerta trasera',
+              'amountEur': null,
+              'type': 'shared',
+              'status': 'open',
+              'reportedBy': user1Json,
+              'responsible': null,
+              'paidBy': null,
+              'resolvedAt': null,
+              'createdAt': '2026-07-28 10:00:00',
+            },
+            {
+              'id': 11,
+              'date': '2026-07-12',
+              'kind': 'fine',
+              'description': 'Multa zona azul',
+              'amountEur': 90,
+              'type': 'individual',
+              'status': 'resolved',
+              'reportedBy': user1Json,
+              'responsible': user2Json,
+              'paidBy': user1Json,
+              'resolvedAt': '2026-07-15 10:00:00',
+              'createdAt': '2026-07-12 10:00:00',
+            },
+          ],
+          'openCount': 1,
+          'pendingAmountEur': 0,
+          'totalPerUser': const [],
+        },
+      });
+
+      final open = exp.incidents.list.first;
+      expect(open.amountEur, isNull);
+      expect(open.isOpen, isTrue);
+      expect(open.kind, IncidentKind.damage);
+      expect(open.paidBy, isNull);
+
+      final resolved = exp.incidents.list[1];
+      expect(resolved.amountEur, 90);
+      expect(resolved.status, IncidentStatus.resolved);
+      expect(resolved.responsible?.name, 'Dennis');
+      expect(resolved.paidBy?.name, 'Andy');
+      expect(exp.incidents.openCount, 1);
+    });
+
+    test('incidencias: un tipo desconocido no rompe la app instalada', () {
+      final incident = Incident.fromJson({
+        'id': 1,
+        'date': '2026-07-28',
+        'kind': 'meteorito',
+        'description': 'x',
+        'amountEur': null,
+        'type': 'shared',
+        'status': 'archivada',
+        'reportedBy': user1Json,
+      });
+      expect(incident.kind, IncidentKind.other);
+      expect(incident.status, IncidentStatus.open);
     });
   });
 }
