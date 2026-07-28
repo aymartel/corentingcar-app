@@ -5,6 +5,7 @@ import 'package:coretingcar/data/models/models.dart';
 import 'package:coretingcar/data/services/auth_service.dart';
 import 'package:coretingcar/data/services/car_status_service.dart';
 import 'package:coretingcar/data/services/expenses_service.dart';
+import 'package:coretingcar/data/services/mileage_plan_service.dart';
 import 'package:coretingcar/data/services/priority_service.dart';
 import 'package:coretingcar/data/services/request_service.dart';
 import 'package:coretingcar/data/services/rules_service.dart';
@@ -560,7 +561,121 @@ Rules rulesSample() => const Rules(
   anchorUserId: 1,
   firstWashUserId: 2,
   timezone: 'Europe/Madrid',
+  kmPlan: baselinePlanSample,
 );
+
+/// Plan de kilometraje de partida (15.000 km/año, 355 €/mes).
+const baselinePlanSample = MileagePlan(
+  annualKmTotal: 15000,
+  annualKmPerPerson: 7500,
+  monthlyKmTotal: 1250,
+  monthlyKmPerPerson: 625,
+  monthlyFeeEur: 355,
+  feePerPerson: 177.5,
+);
+
+/// Cambio programado a 25.000 km/año desde agosto de 2026 (el caso del usuario).
+const scheduledPlanSample = MileagePlan(
+  id: 1,
+  effectiveMonth: '2026-08',
+  annualKmTotal: 25000,
+  annualKmPerPerson: 12500,
+  monthlyKmTotal: 2083,
+  monthlyKmPerPerson: 1041.67,
+  monthlyFeeEur: 425,
+  feePerPerson: 212.5,
+  createdBy: user1,
+  createdAt: '2026-07-28 10:00:00',
+);
+
+/// `MileagePlanService` controlable para tests (sin red).
+class FakeMileagePlanService extends MileagePlanService {
+  FakeMileagePlanService({MileagePlansView? result, this.error})
+    : result = result ?? mileagePlansSample(),
+      super(ApiClient(tokenReader: () async => null));
+
+  MileagePlansView result;
+  final ApiException? error;
+
+  int scheduleCalls = 0;
+  int cancelCalls = 0;
+  int? lastAnnualKmTotal;
+  double? lastMonthlyFeeEur;
+
+  @override
+  Future<MileagePlansView> plans() async {
+    await Future<void>.delayed(Duration.zero);
+    if (error != null) throw error!;
+    return result;
+  }
+
+  @override
+  Future<MileagePlansView> schedule({
+    required int annualKmTotal,
+    required double monthlyFeeEur,
+  }) async {
+    await Future<void>.delayed(Duration.zero);
+    scheduleCalls += 1;
+    lastAnnualKmTotal = annualKmTotal;
+    lastMonthlyFeeEur = monthlyFeeEur;
+    if (error != null) throw error!;
+    return result;
+  }
+
+  @override
+  Future<MileagePlansView> cancelScheduled() async {
+    await Future<void>.delayed(Duration.zero);
+    cancelCalls += 1;
+    if (error != null) throw error!;
+    return result;
+  }
+}
+
+/// Vista de planes de muestra: vigente 15.000, sin cambio programado.
+MileagePlansView mileagePlansSample({MileagePlan? scheduled}) =>
+    MileagePlansView(
+      current: baselinePlanSample,
+      scheduled: scheduled,
+      history: [?scheduled, baselinePlanSample],
+      options: const [
+        MileagePlanOption(
+          annualKmTotal: 15000,
+          annualKmPerPerson: 7500,
+          monthlyKmTotal: 1250,
+          monthlyKmPerPerson: 625,
+          monthlyFeeEur: 355,
+          feePerPerson: 177.5,
+          extraFeeEur: 0,
+          feeDeltaEur: 0,
+          isCurrent: true,
+          isScheduled: false,
+        ),
+        MileagePlanOption(
+          annualKmTotal: 20000,
+          annualKmPerPerson: 10000,
+          monthlyKmTotal: 1667,
+          monthlyKmPerPerson: 833.33,
+          monthlyFeeEur: 385,
+          feePerPerson: 192.5,
+          extraFeeEur: 30,
+          feeDeltaEur: 30,
+          isCurrent: false,
+          isScheduled: false,
+        ),
+        MileagePlanOption(
+          annualKmTotal: 25000,
+          annualKmPerPerson: 12500,
+          monthlyKmTotal: 2083,
+          monthlyKmPerPerson: 1041.67,
+          monthlyFeeEur: 425,
+          feePerPerson: 212.5,
+          extraFeeEur: 70,
+          feeDeltaEur: 70,
+          isCurrent: false,
+          isScheduled: false,
+        ),
+      ],
+    );
 
 /// `RequestService` controlable para tests (sin red).
 class FakeRequestService extends RequestService {
@@ -781,14 +896,18 @@ MileageSummary mileageSample() => const MileageSummary(
   annualKmPerPerson: 7500,
   sharedKm: 120.5,
   sharedKmPerPerson: 60.25,
+  windowStart: '2026-01-01',
   kmStartDate: '2026-06-10',
   monthlyKmPerPerson: 625,
+  currentMonthKmTotal: 1250,
+  currentMonthKmPerPerson: 625,
   dailyKmPerPerson: 20.8,
   recommendedYearToDate: 6000,
   months: [
     MonthMileage(
       month: '2026-06',
       recommendedPerPerson: 437.5,
+      budgetPerPerson: 625,
       perUser: [
         MonthUsage(userId: 1, used: 400),
         MonthUsage(userId: 2, used: 700),
@@ -797,11 +916,70 @@ MileageSummary mileageSample() => const MileageSummary(
     MonthMileage(
       month: '2026-07',
       recommendedPerPerson: 625,
+      budgetPerPerson: 625,
       perUser: [
-        MonthUsage(userId: 1, used: 500), // 125 por debajo (naranja)
-        MonthUsage(userId: 2, used: 900), // 275 por encima (rojo)
+        MonthUsage(userId: 1, used: 500), // por debajo del cupo → verde
+        MonthUsage(userId: 2, used: 900), // por encima del cupo → rojo
       ],
     ),
+  ],
+);
+
+/// Año con el plan cambiado a mitad: 15.000 hasta julio y 25.000 desde agosto.
+/// Cupo 2026 = 7×625 + 5×1.041,67 = 9.583 por persona (19.166 en total).
+MileageSummary mileageMixedYearSample() => const MileageSummary(
+  people: [
+    PersonMileage(
+      user: user1,
+      individualKm: 6240,
+      usedKm: 6240,
+      remainingKm: 3343,
+      exceeded: false,
+      excessKm: 0,
+    ),
+    PersonMileage(
+      user: user2,
+      individualKm: 8430,
+      usedKm: 8430,
+      remainingKm: 1153,
+      exceeded: false,
+      excessKm: 0,
+    ),
+  ],
+  annualKmTotal: 19166,
+  annualKmPerPerson: 9583,
+  sharedKm: 120.5,
+  sharedKmPerPerson: 60.25,
+  windowStart: '2026-01-01',
+  kmStartDate: '2026-06-10',
+  monthlyKmPerPerson: 1042,
+  currentMonthKmTotal: 2083,
+  currentMonthKmPerPerson: 1041.67,
+  dailyKmPerPerson: 33.6,
+  recommendedYearToDate: 6000,
+  months: [
+    MonthMileage(
+      month: '2026-07',
+      recommendedPerPerson: 625,
+      budgetPerPerson: 625, // plan viejo
+      perUser: [
+        MonthUsage(userId: 1, used: 500),
+        MonthUsage(userId: 2, used: 900),
+      ],
+    ),
+    MonthMileage(
+      month: '2026-08',
+      recommendedPerPerson: 336,
+      budgetPerPerson: 1041.67, // plan nuevo: otra escala
+      perUser: [
+        MonthUsage(userId: 1, used: 500),
+        MonthUsage(userId: 2, used: 900),
+      ],
+    ),
+  ],
+  yearPlanSegments: [
+    YearPlanSegment(fromMonth: 1, toMonth: 7, annualKmTotal: 15000),
+    YearPlanSegment(fromMonth: 8, toMonth: 12, annualKmTotal: 25000),
   ],
 );
 

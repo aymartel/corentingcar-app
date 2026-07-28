@@ -56,6 +56,10 @@ final usageChangeServiceProvider = Provider<UsageChangeService>(
   (ref) => UsageChangeService(ref.watch(apiClientProvider)),
 );
 
+final mileagePlanServiceProvider = Provider<MileagePlanService>(
+  (ref) => MileagePlanService(ref.watch(apiClientProvider)),
+);
+
 final expensesServiceProvider = Provider<ExpensesService>(
   (ref) => ExpensesService(ref.watch(apiClientProvider)),
 );

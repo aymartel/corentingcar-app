@@ -11,6 +11,7 @@ import '../../core/format/es_format.dart';
 import '../../data/api/api_exception.dart';
 import '../../data/models/models.dart';
 import '../login/session_controller.dart';
+import 'mileage_plan_sheet.dart';
 import 'rules_controller.dart';
 
 /// Pantalla REGLAS / Ajustes (Fase F9): resumen **de solo lectura** del acuerdo
@@ -87,12 +88,27 @@ class _RulesCards extends StatelessWidget {
 
   final Rules rules;
 
+  /// "Programado: 25.000 km/año desde agosto 2026" si hay un cambio pendiente.
+  String? _scheduledLabel() {
+    final scheduled = rules.scheduledKmPlan;
+    final month = scheduled?.effectiveMonth;
+    if (scheduled == null || month == null) return null;
+    final date = DateTime(
+      int.parse(month.substring(0, 4)),
+      int.parse(month.substring(5, 7)),
+    );
+    return 'Programado: ${EsFormat.km(scheduled.annualKmTotal)} km/año '
+        'desde ${EsFormat.monthYear(date)}';
+  }
+
   @override
   Widget build(BuildContext context) {
     final anchor = DateTime.tryParse(rules.anchorDate);
     final anchorLabel = anchor == null
         ? rules.anchorDate
         : EsFormat.date(anchor);
+    final plan = rules.kmPlan;
+    final scheduledLabel = _scheduledLabel();
 
     return Column(
       children: [
@@ -108,9 +124,15 @@ class _RulesCards extends StatelessWidget {
           icon: Icons.speed_outlined,
           title: 'Kilómetros',
           value: '${EsFormat.km(rules.annualKmTotal)} km/año',
-          subtitle:
-              '${EsFormat.km(rules.annualKmPerPerson)} km por persona · '
-              'el exceso lo paga quien lo genera',
+          subtitle: plan == null
+              ? '${EsFormat.km(rules.annualKmPerPerson)} km por persona · '
+                    'el exceso lo paga quien lo genera'
+              : '${EsFormat.km(rules.annualKmPerPerson)} km por persona · '
+                    '${EsFormat.km(plan.monthlyKmTotal)} km/mes '
+                    '(${EsFormat.decimal(plan.monthlyKmPerPerson)} cada uno)',
+          // Solo es editable si el backend ya sirve el plan (app nueva / backend viejo).
+          onTap: plan == null ? null : () => openMileagePlanSheet(context),
+          footer: scheduledLabel,
         ),
         _RuleCard(
           icon: Icons.swap_horiz,
@@ -142,12 +164,20 @@ class _RuleCard extends StatelessWidget {
     required this.title,
     required this.value,
     required this.subtitle,
+    this.onTap,
+    this.footer,
   });
 
   final IconData icon;
   final String title;
   final String value;
   final String subtitle;
+
+  /// Si se indica, la tarjeta es pulsable (y muestra el chevrón).
+  final VoidCallback? onTap;
+
+  /// Línea extra destacada bajo el subtítulo (p.ej. un cambio programado).
+  final String? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -158,6 +188,7 @@ class _RuleCard extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: AppSpacing.md),
       child: GlowCard(
+        onTap: onTap,
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -177,9 +208,24 @@ class _RuleCard extends StatelessWidget {
                   ),
                   const SizedBox(height: AppSpacing.xs),
                   Text(subtitle, style: theme.textTheme.bodySmall),
+                  if (footer != null) ...[
+                    const SizedBox(height: AppSpacing.xs),
+                    Text(
+                      footer!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ],
                 ],
               ),
             ),
+            if (onTap != null)
+              const Icon(
+                Icons.chevron_right,
+                color: AppColors.textMuted,
+                size: 20,
+              ),
           ],
         ),
       ),

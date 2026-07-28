@@ -65,6 +65,7 @@ class MonthMileage {
     required this.month,
     required this.recommendedPerPerson,
     required this.perUser,
+    this.budgetPerPerson = 0,
   });
 
   /// Mes `YYYY-MM`.
@@ -72,6 +73,10 @@ class MonthMileage {
 
   /// Km aconsejados por persona ese mes (prorrateado a hoy si es el mes en curso).
   final double recommendedPerPerson;
+
+  /// Cupo COMPLETO por persona de ese mes, según el plan vigente entonces (625 con 15.000,
+  /// 1.041,67 con 25.000). Es la escala de la barra mensual. 0 si el backend no lo envía.
+  final double budgetPerPerson;
 
   /// Km usados por persona ese mes.
   final List<MonthUsage> perUser;
@@ -87,13 +92,41 @@ class MonthMileage {
   factory MonthMileage.fromJson(JsonMap json) => MonthMileage(
     month: jStr(json['month']),
     recommendedPerPerson: jDouble(json['recommendedPerPerson']),
+    budgetPerPerson: jDoubleOrNull(json['budgetPerPerson']) ?? 0,
     perUser: asMapList(json['perUser']).map(MonthUsage.fromJson).toList(),
   );
 
   JsonMap toJson() => {
     'month': month,
     'recommendedPerPerson': recommendedPerPerson,
+    'budgetPerPerson': budgetPerPerson,
     'perUser': perUser.map((u) => u.toJson()).toList(),
+  };
+}
+
+/// Tramo del año con un plan de kilometraje distinto (para explicar un cupo anual mixto).
+class YearPlanSegment {
+  const YearPlanSegment({
+    required this.fromMonth,
+    required this.toMonth,
+    required this.annualKmTotal,
+  });
+
+  /// Mes inicial y final del tramo (1..12).
+  final int fromMonth;
+  final int toMonth;
+  final int annualKmTotal;
+
+  factory YearPlanSegment.fromJson(JsonMap json) => YearPlanSegment(
+    fromMonth: jInt(json['fromMonth']),
+    toMonth: jInt(json['toMonth']),
+    annualKmTotal: jInt(json['annualKmTotal']),
+  );
+
+  JsonMap toJson() => {
+    'fromMonth': fromMonth,
+    'toMonth': toMonth,
+    'annualKmTotal': annualKmTotal,
   };
 }
 
@@ -105,17 +138,23 @@ class MileageSummary {
     required this.annualKmPerPerson,
     required this.sharedKm,
     required this.sharedKmPerPerson,
+    this.windowStart,
     this.kmStartDate,
     this.monthlyKmPerPerson = 0,
+    this.currentMonthKmTotal = 0,
+    this.currentMonthKmPerPerson = 0,
     this.dailyKmPerPerson = 0,
     this.recommendedYearToDate = 0,
     this.months = const [],
+    this.yearPlanSegments = const [],
   });
 
   /// Una entrada por persona (Andy y Dennis).
   final List<PersonMileage> people;
 
-  /// Total anual (15.000) y cupo por persona (7.500).
+  /// Cupo EFECTIVO del año natural en curso, que puede ser mixto si el plan cambió a mitad de
+  /// año (2026 con subida a 25.000 en agosto → 9.583 por persona y 19.166 en total). El NOMINAL
+  /// del plan contratado (25.000 km/año) está en [Rules.annualKmTotal].
   final int annualKmTotal;
   final int annualKmPerPerson;
 
@@ -123,11 +162,27 @@ class MileageSummary {
   final double sharedKm;
   final double sharedKmPerPerson;
 
+  /// Primer día de la ventana de cómputo (`YYYY-01-01` con el año natural).
+  final String? windowStart;
+
+  /// Año de la ventana en curso; el año actual si el backend no manda la ventana.
+  String get windowYear =>
+      windowStart != null && windowStart!.length >= 4
+      ? windowStart!.substring(0, 4)
+      : '${DateTime.now().year}';
+
   /// Fecha del primer uso (inicio del cómputo); `null` si no hay usos.
   final String? kmStartDate;
 
-  /// Cupo aconsejado por persona: mensual (= anual/12) y diario (referencia).
+  /// Cupo mensual por persona del mes en curso, redondeado a entero (compatibilidad).
   final int monthlyKmPerPerson;
+
+  /// Cupo del mes en curso de los dos juntos = anual / 12 (25.000 → 2.083). Es la cifra que
+  /// enseña la app del renting.
+  final int currentMonthKmTotal;
+
+  /// Cupo del mes en curso por persona, con decimales (25.000 → 1.041,67).
+  final double currentMonthKmPerPerson;
   final double dailyKmPerPerson;
 
   /// Km aconsejados por persona ACUMULADOS en el año en curso hasta hoy (barra anual).
@@ -136,19 +191,28 @@ class MileageSummary {
   /// Uso vs aconsejado de cada mes registrado (barra mensual / carrusel).
   final List<MonthMileage> months;
 
+  /// Tramos del año si el plan cambió a mitad (vacío o 1 elemento si fue constante).
+  final List<YearPlanSegment> yearPlanSegments;
+
   factory MileageSummary.fromJson(JsonMap json) => MileageSummary(
     people: asMapList(json['perUser']).map(PersonMileage.fromJson).toList(),
     annualKmTotal: jInt(json['annualKmTotal']),
     annualKmPerPerson: jInt(json['annualKmPerPerson']),
     sharedKm: jDouble(json['sharedKm']),
     sharedKmPerPerson: jDouble(json['sharedKmPerPerson']),
+    windowStart: jStrOrNull(json['windowStart']),
     kmStartDate: jStrOrNull(json['kmStartDate']),
     monthlyKmPerPerson: jIntOrNull(json['monthlyKmPerPerson']) ?? 0,
+    currentMonthKmTotal: jIntOrNull(json['currentMonthKmTotal']) ?? 0,
+    currentMonthKmPerPerson: jDoubleOrNull(json['currentMonthKmPerPerson']) ?? 0,
     dailyKmPerPerson: jDoubleOrNull(json['dailyKmPerPerson']) ?? 0,
     recommendedYearToDate: jDoubleOrNull(json['recommendedYearToDate']) ?? 0,
     months: json['months'] == null
         ? const []
         : asMapList(json['months']).map(MonthMileage.fromJson).toList(),
+    yearPlanSegments: json['yearPlanSegments'] == null
+        ? const []
+        : asMapList(json['yearPlanSegments']).map(YearPlanSegment.fromJson).toList(),
   );
 
   JsonMap toJson() => {
@@ -157,10 +221,14 @@ class MileageSummary {
     'annualKmPerPerson': annualKmPerPerson,
     'sharedKm': sharedKm,
     'sharedKmPerPerson': sharedKmPerPerson,
+    'windowStart': windowStart,
     'kmStartDate': kmStartDate,
     'monthlyKmPerPerson': monthlyKmPerPerson,
+    'currentMonthKmTotal': currentMonthKmTotal,
+    'currentMonthKmPerPerson': currentMonthKmPerPerson,
     'dailyKmPerPerson': dailyKmPerPerson,
     'recommendedYearToDate': recommendedYearToDate,
     'months': months.map((m) => m.toJson()).toList(),
+    'yearPlanSegments': yearPlanSegments.map((s) => s.toJson()).toList(),
   };
 }

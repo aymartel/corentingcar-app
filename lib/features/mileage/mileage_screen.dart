@@ -90,18 +90,26 @@ class _MileageContent extends StatelessWidget {
   }
 }
 
-// Margen aconsejado (± km) antes de avisar: amplio en la anual, ajustado en la mensual.
+// Cuánto puedes pasarte del cupo antes de que la barra se ponga roja.
 const double _annualToleranceKm = 500;
-const double _monthlyToleranceKm = 50;
 
-/// Color según la desviación `d = usado − aconsejado` y el margen `tol`:
-/// verde dentro de ±tol, rojo si te pasas +tol por encima, naranja si vas −tol por debajo.
-Color _deviationColor(double d, double tol) {
-  if (d > tol) return AppColors.danger;
-  if (d < -tol) return AppColors.warning;
+/// Margen del mes, proporcional al cupo para que no dependa del plan contratado
+/// (con 625 km/mes son 50 km, con 1.042 son ~52).
+double _monthlyTolerance(double budget) =>
+    budget <= 0 ? 50 : (budget * 0.08).clamp(50, 200);
+
+/// Color de la barra según el consumo frente al **cupo del periodo**:
+/// verde mientras no lo superes —ir por debajo NUNCA es un aviso—, naranja al
+/// superarlo y rojo cuando te pasas del margen.
+Color budgetColor(double used, double budget, double tolerance) {
+  if (budget <= 0) return AppColors.success;
+  if (used > budget + tolerance) return AppColors.danger;
+  if (used > budget) return AppColors.warning;
   return AppColors.success;
 }
 
+/// Texto informativo del ritmo (`d = usado − aconsejado`). Se pinta en color
+/// neutro: informa de si vas adelantado o retrasado, pero no alarma.
 String _deviationText(double d) {
   if (d.abs() < 0.5) return 'en línea';
   return d > 0
@@ -130,7 +138,9 @@ class _DeviationBar extends StatelessWidget {
     final s = scale <= 0 ? 1.0 : scale;
     final usedRatio = (used / s).clamp(0.0, 1.0);
     final recRatio = (recommended / s).clamp(0.0, 1.0);
-    final fill = _deviationColor(used - recommended, tolerance);
+    // El color lo manda el CUPO del periodo (`scale`), no el ritmo: ir por debajo
+    // del aconsejado no es un problema y debe seguir en verde.
+    final fill = budgetColor(used, scale, tolerance);
 
     return Container(
       decoration: BoxDecoration(
@@ -243,10 +253,8 @@ class _DeviationBlock extends StatelessWidget {
                 style: AppTypography.hudLabel(),
               ),
             ),
-            Text(
-              _deviationText(d),
-              style: AppTypography.hudLabel(color: _deviationColor(d, tolerance)),
-            ),
+            // El ritmo se informa en color neutro; el aviso lo da la barra (cupo).
+            Text(_deviationText(d), style: AppTypography.hudLabel()),
           ],
         ),
         const SizedBox(height: AppSpacing.sm),
@@ -282,8 +290,11 @@ class _PersonMileageCard extends StatelessWidget {
     final user = person.user;
     final color = colorFromHex(user.color) ?? personColor(user.profile);
     final theme = Theme.of(context);
-    final annualDiff = person.usedKm - summary.recommendedYearToDate;
-    final headerColor = _deviationColor(annualDiff, _annualToleranceKm);
+    final headerColor = budgetColor(
+      person.usedKm.toDouble(),
+      limit.toDouble(),
+      _annualToleranceKm,
+    );
 
     return GlowCard(
       accentColor: color,
@@ -313,9 +324,9 @@ class _PersonMileageCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          // Barra ANUAL (se reinicia el 1 de enero): usado vs aconsejado del año.
+          // Barra del AÑO (se reinicia el 1 de enero): usado vs aconsejado del año.
           _DeviationBlock(
-            label: 'ANUAL',
+            label: 'CUPO ${summary.windowYear}',
             used: person.usedKm.toDouble(),
             recommended: summary.recommendedYearToDate,
             scale: limit.toDouble(),
@@ -392,7 +403,7 @@ class _MonthlyCarousel extends StatefulWidget {
 }
 
 class _MonthlyCarouselState extends State<_MonthlyCarousel> {
-  late final PageController _controller;
+  late PageController _controller;
   late int _page;
 
   @override
@@ -400,6 +411,18 @@ class _MonthlyCarouselState extends State<_MonthlyCarousel> {
     super.initState();
     _page = widget.months.length - 1; // por defecto el mes en curso (el último)
     _controller = PageController(initialPage: _page);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MonthlyCarousel oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Si tras refrescar hay más (o menos) meses, la página vieja dejaría los
+    // puntos desincronizados o apuntaría a un mes inexistente.
+    if (widget.months.length != oldWidget.months.length) {
+      _page = widget.months.length - 1;
+      _controller.dispose();
+      _controller = PageController(initialPage: _page);
+    }
   }
 
   @override
@@ -431,12 +454,17 @@ class _MonthlyCarouselState extends State<_MonthlyCarousel> {
             onPageChanged: (i) => setState(() => _page = i),
             itemBuilder: (context, i) {
               final m = widget.months[i];
+              // Cada mes se dibuja contra SU cupo: julio a 15.000 y agosto a
+              // 25.000 no comparten escala. Fallback si el backend es antiguo.
+              final budget = m.budgetPerPerson > 0
+                  ? m.budgetPerPerson
+                  : widget.monthlyBudget.toDouble();
               return _DeviationBlock(
                 label: _monthLabel(m.month),
                 used: m.usedFor(widget.userId),
                 recommended: m.recommendedPerPerson,
-                scale: widget.monthlyBudget.toDouble(),
-                tolerance: _monthlyToleranceKm,
+                scale: budget,
+                tolerance: _monthlyTolerance(budget),
               );
             },
           ),
@@ -613,6 +641,8 @@ class _AnnualCard extends StatelessWidget {
     final total = summary.annualKmTotal;
     final ratio = total == 0 ? 0.0 : totalUsed / total;
     final theme = Theme.of(context);
+    final year = summary.windowYear;
+    final segments = summary.yearPlanSegments;
 
     return GlowCard(
       child: Column(
@@ -620,7 +650,7 @@ class _AnnualCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              Text('TOTAL', style: AppTypography.hudLabel()),
+              Text('TOTAL $year', style: AppTypography.hudLabel()),
               const Spacer(),
               Text(
                 '${EsFormat.km(totalUsed)} / ${EsFormat.km(total)} km',
@@ -632,14 +662,57 @@ class _AnnualCard extends StatelessWidget {
           _SimpleBar(ratio: ratio, fill: AppColors.brand),
           const SizedBox(height: AppSpacing.md),
           Text(
-            '${EsFormat.km(summary.annualKmPerPerson)} km por persona al año. '
+            '${EsFormat.km(summary.annualKmPerPerson)} km por persona este año. '
             'El exceso lo paga quien lo genera.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppColors.textSecondary,
             ),
           ),
+          if (summary.currentMonthKmTotal > 0) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Este mes: ${EsFormat.km(summary.currentMonthKmTotal)} km · '
+              '${EsFormat.decimal(summary.currentMonthKmPerPerson)} por persona.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+          // Si el plan cambió a mitad de año, el cupo es mixto: sin esta línea
+          // un total de 19.166 km parece un error.
+          if (segments.length > 1) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              segments.map(_segmentLabel).join(' · '),
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppColors.textMuted,
+              ),
+            ),
+          ],
         ],
       ),
     );
   }
+}
+
+/// "15.000 km/año (ene–jul)" para un tramo del año con un plan distinto.
+String _segmentLabel(YearPlanSegment s) {
+  const months = [
+    'ene',
+    'feb',
+    'mar',
+    'abr',
+    'may',
+    'jun',
+    'jul',
+    'ago',
+    'sep',
+    'oct',
+    'nov',
+    'dic',
+  ];
+  final from = months[s.fromMonth - 1];
+  final to = months[s.toMonth - 1];
+  final range = s.fromMonth == s.toMonth ? from : '$from–$to';
+  return '${EsFormat.km(s.annualKmTotal)} km/año ($range)';
 }

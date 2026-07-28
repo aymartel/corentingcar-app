@@ -10,6 +10,7 @@ export 'expenses_summary.dart';
 export 'fuel_log.dart';
 export 'fuel_preview.dart';
 export 'json_utils.dart';
+export 'mileage_plan.dart';
 export 'mileage_summary.dart';
 export 'other_expense_log.dart';
 export 'request_status.dart';
