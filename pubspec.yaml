@@ -109,10 +109,10 @@ flutter_launcher_icons:
   ios: true
   image_path: "assets/brand/logo-app-corenting.png"
   # Android adaptativo: el diseño va de primer plano con inset (Android recorta el ~66% central;
-  # el inset evita que se coma el coche) sobre fondo negro, que funde con el negro de la imagen.
+  # el inset evita que se coma el coche y el texto inferior) sobre fondo negro, que funde con el negro de la imagen.
   adaptive_icon_background: "#000000"
   adaptive_icon_foreground: "assets/brand/logo-app-corenting.png"
-  adaptive_icon_foreground_inset: 16
+  adaptive_icon_foreground_inset: 22
   remove_alpha_ios: true # iOS no admite alfa en el icono
   background_color_ios: "#000000"
   min_sdk_android: 21
