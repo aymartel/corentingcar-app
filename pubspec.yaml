@@ -101,18 +101,18 @@ flutter:
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
 
-# --- Icono de la app (render del Jeep con brillo verde sobre negro) ---
-# Origen: imagen ya compuesta assets/brand/logo-app-corenting.png (1024×1024, fondo negro).
+# --- Icono de la app (Jeep negro cinematográfico con luz bicolor naranja/verde) ---
+# Origen: imagen ya compuesta assets/brand/logo-app-corenting.png (1024×1024, Jeep negro con luz naranja/verde).
 # Tras cambiarla, regenerar con `dart run flutter_launcher_icons`.
 flutter_launcher_icons:
   android: true
   ios: true
   image_path: "assets/brand/logo-app-corenting.png"
   # Android adaptativo: el diseño va de primer plano con inset (Android recorta el ~66% central;
-  # el inset evita que se coma el coche y el texto inferior) sobre fondo negro, que funde con el negro de la imagen.
+  # el inset evita que se coma el coche; la imagen es a sangre, así que no se ve borde) sobre fondo negro.
   adaptive_icon_background: "#000000"
   adaptive_icon_foreground: "assets/brand/logo-app-corenting.png"
-  adaptive_icon_foreground_inset: 22
+  adaptive_icon_foreground_inset: 16
   remove_alpha_ios: true # iOS no admite alfa en el icono
   background_color_ios: "#000000"
   min_sdk_android: 21
